@@ -1,86 +1,133 @@
 def main():
+    """Main entry point of the program."""
     print("Hello from my-python-project!")
 
 
 if __name__ == "__main__":
     main()
-# commment in
 
-print(" my name is")
+# ===== 1. Basic Loop Examples =====
+print("\n--- 1. For Loop Example ---")
+name = "tuyen"
 for i in range(5):
-    print(" tuyen five times" + str(i))
+    print(f"{name} {i}")
 
-a = not True
+# ===== 2. Boolean Logic =====
+print("\n--- 2. Boolean Logic ---")
+a = not True  # not True = False
 if a:
-    print(" a is true")
+    print("a is true")
+else:
+    print("a is false")
 
-42 == 42
+# Comparison
+print(f"42 == 42: {42 == 42}")
+
+# ===== 3. While Loop Example =====
+print("\n--- 3. While Loop Example ---")
 spam = 0
 while spam < 5:
-    print("i learn python " + str(spam))
+    print(f"I learn Python: {spam}")
     spam += 1
 
-chuoi = "hello worldthis is \na long stringthat spans multiple lines"
-result = chuoi * 5
-print(result)
+# ===== 4. String Operations =====
+print("\n--- 4. String Operations ---")
+text = "hello world\nthis is a long string\nthat spans multiple lines"
+repeat_text = text * 2  # Repeat string 2 times
+print(f"Original text:\n{text}")
+print(f"\nLength: {len(text)}")
 
-test = "abcdef"
-print(len(test))
+# ===== 5. Turtle Graphics Example (commented out) =====
+# from turtle import penup, pendown, forward
+#
+# def jump(length):
+#     """Move forward length units without leaving a trail.
+#
+#     Postcondition: Leaves the pen down.
+#     """
+#     penup()
+#     forward(length)
+#     pendown()
 
-from turtle import penup, pendown, forward
-
-
-def jump(lenght):
-    """Move forward length units without leaving a trail.
-
-    Postcondition: Leaves the pen down.
-    """
-    penup()
-    forward(lenght)
-    pendown()
-
-
+# ===== 6. Random Numbers =====
+print("\n--- 6. Random Numbers ---")
 import random
 
-random.randint(1, 46)
+random_num = random.randint(1, 46)
+print(f"Random number between 1-46: {random_num}")
+
+# ===== 7. Functions with Parameters =====
+print("\n--- 7. Functions with Parameters ---")
 
 
-def team(text, age):
-    print(text)
-    print(age)
+def display_info(text, age):
+    """Display text and age information."""
+    print(f"Text: {text}")
+    print(f"Age: {age}")
 
 
-team("hello", 86)
-team("world", 96)
-team("at", 36)
-team("vietnam", "fgsdfg")
+# Calling function with different arguments
+display_info("hello", 86)
+display_info("world", 96)
+display_info("vietnam", 36)
+
+# ===== 8. Default Parameters =====
+print("\n--- 8. Default Parameters ---")
 
 
-def team(text, age=0, success=False):
-    print(text)
-    print(age)
-    print(success)
+def display_info_with_defaults(text, age=0, success=False):
+    """Display info with default parameter values."""
+    print(f"Text: {text}")
+    print(f"Age: {age}")
+    print(f"Success: {success}")
 
 
-team("paramater defualt", 861)
+display_info_with_defaults("parameter defaults", 861)
 
+# ===== 9. String Methods =====
+print("\n--- 9. String Methods ---")
+original = "how method of string works"
 
-def kteam(name, member):
-    print(name)
-    print(member)
+print(f"Original: {original}")
+print(f"title(): {original.title()}")
+print(f"upper(): {original.upper()}")
+print(f"center(50, '-'): {original.center(50, '-')}")
+print(f"ljust(50, '-'): {original.ljust(50, '-')}")
+print(f"rjust(50, '-'): {original.rjust(50, '-')}")
 
+# ===== 10. String Encoding and Joining =====
+print("\n--- 10. String Encoding & Joining ---")
+text_unicode = "Python"
+encoded = text_unicode.encode("utf-8")
+print(f"Encoded: {encoded}")
 
-a = "how method of string concatenation works"
-# b = a.capitalize()
-# b = a.upper()
-# b = a.lower()
-# b = a.swapcase()
-b = a.title()
-b = a.center(50,'-')
-b = a.ljust(50,'-')
-b = a.rjust(50,'-')
-c = 'có gì hót'
-d = c.encode('utf-8')
-e = c.join(['a', 'b', 'c','d'])
-d = a.strip() # xóa hết khoảng trắng giống strim của dart
-print(e)
+joined = ", ".join(["apple", "banana", "cherry"])
+print(f"Joined: {joined}")
+
+# ===== 11. String Splitting and Partitioning =====
+print("\n--- 11. Splitting & Partitioning ---")
+text_split = "how method of string works"
+split_result = text_split.split(" ")
+print(f"Split by space: {split_result}")
+
+partition_result = text_split.partition(" ")
+print(f"Partition: {partition_result}")
+
+rpartition_result = text_split.rpartition(" ")
+print(f"Right partition: {rpartition_result}")
+
+# ===== 12. String Searching Methods =====
+print("\n--- 12. String Searching ---")
+text_search = "how method of string works"
+print(f"Count 'o': {text_search.count('o')}")
+print(f"Count 'o' (0-10): {text_search.count('o', 0, 10)}")
+print(f"Starts with 'how': {text_search.startswith('how')}")
+print(f"Find 't': {text_search.find('t')}")
+# Note: find() returns -1 if not found, index() raises error if not found
+
+# ===== 13. String Trimming =====
+print("\n--- 13. String Trimming ---")
+text_spaces = "  hello world  "
+print(f"strip(): '{text_spaces.strip()}'")
+print(f"lstrip(): '{text_spaces.lstrip()}'")
+print(f"rstrip(): '{text_spaces.rstrip()}'")
