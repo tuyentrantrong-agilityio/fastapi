@@ -41,10 +41,10 @@ def stemmer(word):
     result = re.match(r"^([^aeiou]+)?(.*)$", word)
 
     if result:  # If the word starts with a consonant
-        print(result.group(1))
-        print(result.group(2))
-        print(result)
-        return (result.group(1), result.group(2))
+        # print(result.group(1))
+        # print(result.group(2))
+        # print(result)
+        return (result.group(1) or "", result.group(2))
     else:
         return (word, "")
 
@@ -58,6 +58,7 @@ def test_stemmer():
     assert stemmer("chair") == ("ch", "air")
     assert stemmer("APPLE") == ("", "apple")
     assert stemmer("RDNZL") == ("rdnzl", "")
+    assert stemmer('123') == ('123', '')
 
 
 # -------------------------------------------------

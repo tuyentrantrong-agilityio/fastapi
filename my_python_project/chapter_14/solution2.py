@@ -41,7 +41,7 @@ def stemmer(word):
 
     for i in range(len(word)):
         if word[i] in "aeiou":
-            print("".join(start), word[i:])
+            # print("".join(start), word[i:])
             return ("".join(start), word[i:])
         else:
             start.append(word[i])
