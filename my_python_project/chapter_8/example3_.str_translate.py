@@ -1,4 +1,4 @@
-"""Apples and Bananas"""
+"""Apples and Bananas - Using str.translate() method"""
 
 import argparse
 import os
@@ -26,16 +26,24 @@ def get_args():
     return args
 
 
-# -------------------------------------------------
+def replace_vowels_translate(text, vowel):
+    """Replace vowels using str.translate() method.
+
+    Args:
+        text: Input text string
+        vowel: Replacement vowel (lowercase)
+
+    Returns:
+        Text with vowels replaced
+    """
+    return text.translate(str.maketrans("aeiouAEIOU", vowel * 5 + vowel.upper() * 5))
+
+
 def main():
     """Make a jazz noise here"""
     args = get_args()
-    vowel = args.vowel
-
-    text = args.text.translate(
-        str.maketrans("aeiouAEIOU", vowel * 5 + vowel.upper() * 5)
-    )
-    print(text)
+    result = replace_vowels_translate(args.text, args.vowel)
+    print(result)
 
 
 # -------------------------------------------------

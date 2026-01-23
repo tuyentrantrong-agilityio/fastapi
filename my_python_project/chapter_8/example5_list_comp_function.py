@@ -27,18 +27,29 @@ def get_args():
 
 
 # -------------------------------------------------
+def replace_vowels_closure(text, vowel):
+    """Replace vowels using generator expression with closure.
+
+    Args:
+        text (str): Input text to transform
+        vowel (str): Single character to replace vowels with
+
+    Returns:
+        str: Text with vowels replaced
+    """
+
+    def new_char(char):
+        return vowel if char in "aeiou" else vowel.upper() if char in "AEIOU" else char
+
+    return "".join(new_char(char) for char in text)
+
+
+# -------------------------------------------------
 def main():
     """Make a jazz noise here"""
     args = get_args()
-    vowel = args.vowel
-
-    def new_chart(chart):
-        return (
-            vowel if chart in "aeiou" else vowel.upper() if chart in "AEIOU" else chart
-        )
-
-    text = "".join(new_chart(char) for char in args.text)
-    print(text)
+    result = replace_vowels_closure(args.text, args.vowel)
+    print(result)
 
 
 # -------------------------------------------------

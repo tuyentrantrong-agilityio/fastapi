@@ -1,4 +1,4 @@
-"""Apples and Bananas"""
+"""Apples and Bananas - Using str.replace() method"""
 
 import argparse
 import os
@@ -26,16 +26,27 @@ def get_args():
     return args
 
 
-# -------------------------------------------------
+def replace_vowels_str_method(text, vowel):
+    """Replace vowels using str.replace() method.
+
+    Args:
+        text: Input text string
+        vowel: Replacement vowel (lowercase)
+
+    Returns:
+        Text with vowels replaced
+    """
+    result = text
+    for char in "aeiou":
+        result = result.replace(char, vowel).replace(char.upper(), vowel.upper())
+    return result
+
+
 def main():
     """Make a jazz noise here"""
     args = get_args()
-    text = args.text
-    vowel = args.vowel
-
-    for char in "aeiou":
-        text = text.replace(char, vowel).replace(char.upper(), vowel.upper())
-    print(text)
+    result = replace_vowels_str_method(args.text, args.vowel)
+    print(result)
 
 
 # -------------------------------------------------

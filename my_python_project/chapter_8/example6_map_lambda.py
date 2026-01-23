@@ -28,35 +28,37 @@ def get_args():
 
 
 # -------------------------------------------------
-def main():
-    """Make a jazz noise here"""
-    args = get_args()
-    vowel = args.vowel
+def replace_vowels_map_lambda(text, vowel):
+    """Replace vowels using map() with lambda function.
 
-    # Method 1: Use partial to create a new function with keyword-only arguments
-    # This approach binds the vowel argument to the new_chart function
-    # new_text = map(partial(new_chart, vowel=vowel), args.text)
+    Args:
+        text (str): Input text to transform
+        vowel (str): Single character to replace vowels with
 
-    # Method 2: Use lambda to call the existing function with captured vowel variable
-    # This approach wraps the function call in a lambda expression
-    # new_text = map(lambda chart: new_chart(chart, vowel), args.text)
-
-    # Method 3: Use lambda with inline conditional logic
-    # This approach directly implements the logic without calling a separate function
-    new_text = map(
-        lambda chart: vowel
-        if chart in "aeiou"
-        else chart.upper()
-        if chart in "AEIOU"
-        else chart,
-        args.text,
+    Returns:
+        str: Text with vowels replaced
+    """
+    return "".join(
+        map(
+            lambda char: vowel
+            if char in "aeiou"
+            else vowel.upper()
+            if char in "AEIOU"
+            else char,
+            text,
+        )
     )
-    print("".join(new_text))
 
 
 # -------------------------------------------------
+def main():
+    """Make a jazz noise here"""
+    args = get_args()
+    result = replace_vowels_map_lambda(args.text, args.vowel)
+    print(result)
 
 
+# -------------------------------------------------
 def new_chart(chart, vowel):
     return vowel if chart in "aeiou" else vowel.upper() if chart in "AEIOU" else chart
 

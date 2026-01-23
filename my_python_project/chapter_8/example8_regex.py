@@ -28,29 +28,32 @@ def get_args():
 
 
 # -------------------------------------------------
-def main():
-    """Make a jazz noise here"""
-    args = get_args()
-    vowel = args.vowel
+def replace_vowels_regex(text, vowel):
+    """Replace vowels using regex with lambda function.
 
-    # new_text = re.sub(
-    #     "[aeiou]",
-    #     vowel,
-    #     args.text,
-    # )
-    # new_text = re.sub("[AEIOU]", vowel.upper(), new_text)
-    new_text = re.sub(
+    Args:
+        text (str): Input text to transform
+        vowel (str): Single character to replace vowels with
+
+    Returns:
+        str: Text with vowels replaced
+    """
+    return re.sub(
         "[aeiouAEIOU]",
         lambda x: vowel.upper() if x.group().isupper() else vowel,
-        args.text,
+        text,
     )
-    # Need to use . group() because re.sub passes a Match object to the lambda, not the character itself
-    print(new_text)
 
 
 # -------------------------------------------------
+def main():
+    """Make a jazz noise here"""
+    args = get_args()
+    result = replace_vowels_regex(args.text, args.vowel)
+    print(result)
 
 
+# -------------------------------------------------
 def new_chart(chart, vowel):
     return vowel if chart in "aeiou" else vowel.upper() if chart in "AEIOU" else chart
 

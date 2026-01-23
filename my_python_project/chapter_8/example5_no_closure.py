@@ -27,19 +27,31 @@ def get_args():
 
 
 # -------------------------------------------------
-def main():
-    """Make a jazz noise here"""
-    args = get_args()
-    vowel = args.vowel
+def replace_vowels_helper(text, vowel):
+    """Replace vowels using helper function without closure.
 
-    text = "".join(new_chart(char, vowel) for char in args.text)
-    print(text)
+    Args:
+        text (str): Input text to transform
+        vowel (str): Single character to replace vowels with
+
+    Returns:
+        str: Text with vowels replaced
+    """
+    return "".join(new_chart(char, vowel) for char in text)
 
 
 # -------------------------------------------------
 def new_chart(chart, vowel):
     """Return a given vowel if a char is a vowel else the char"""
     return vowel if chart in "aeiou" else vowel.upper() if chart in "AEIOU" else chart
+
+
+# -------------------------------------------------
+def main():
+    """Make a jazz noise here"""
+    args = get_args()
+    result = replace_vowels_helper(args.text, args.vowel)
+    print(result)
 
 
 # -------------------------------------------------

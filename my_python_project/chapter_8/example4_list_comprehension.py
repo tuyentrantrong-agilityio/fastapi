@@ -27,16 +27,30 @@ def get_args():
 
 
 # -------------------------------------------------
+def replace_vowels_listcomp(text, vowel):
+    """Replace vowels using list comprehension.
+
+    Args:
+        text (str): Input text to transform
+        vowel (str): Single character to replace vowels with
+
+    Returns:
+        str: Text with vowels replaced
+    """
+    return "".join(
+        [
+            vowel if char in "aeiou" else vowel.upper() if char in "AEIOU" else char
+            for char in text
+        ]
+    )
+
+
+# -------------------------------------------------
 def main():
     """Make a jazz noise here"""
     args = get_args()
-    vowel = args.vowel
-
-    text = [
-        vowel if char in "aeiou" else vowel.upper() if char in "AEIOU" else char
-        for char in args.text
-    ]
-    print("".join(text))
+    result = replace_vowels_listcomp(args.text, args.vowel)
+    print(result)
 
 
 # -------------------------------------------------
