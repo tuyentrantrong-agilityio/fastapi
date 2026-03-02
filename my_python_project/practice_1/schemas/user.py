@@ -9,7 +9,7 @@ class UserCreate(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {"email": "user@example.com", "password": "secure_password123"}
         }
 
@@ -17,12 +17,37 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    role: str = "user"
 
     class Config:
         from_attributes = True
-        schema_extra = {"example": {"id": 1, "email": "user@example.com"}}
+        json_schema_extra = {
+            "example": {"id": 1, "email": "user@example.com", "role": "user"}
+        }
 
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(None, min_length=8)
+    role: Optional[str] = None
+
+
+class UserInDB(UserResponse):
+    """User object as stored in database (includes hashed password)"""
+
+    hashed_password: str
+
+
+class Token(BaseModel):
+    """OAuth2 token response"""
+
+    access_token: str
+    token_type: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR...",
+                "token_type": "bearer",
+            }
+        }
