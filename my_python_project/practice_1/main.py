@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from core.config import settings
-from routers import user
+from routers import user, task
 
 app = FastAPI(
     title="Practice 1 API",
@@ -11,6 +11,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(user.router)
+app.include_router(task.router)
 
 
 @app.get("/")
