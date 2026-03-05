@@ -1,10 +1,12 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Query, HTTPException
 from fastapi.responses import JSONResponse
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+import math
 
-from schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskStatus
+from schemas.task import TaskCreate, TaskUpdate, TaskResponse
 from schemas.user import UserInDB
+from schemas.query import TaskFilterParams, SortDirection
 from dependencies.user import get_current_user
 from dependencies.task import get_task_or_404
 from db.storage import tasks_db, task_id_counter
@@ -29,11 +31,10 @@ async def create_task(
     Returns:
         Created task with id, user_id, timestamps, etc.
     """
-    # Create new task
     task_id = task_id_counter["id"]
     task_id_counter["id"] += 1
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     tasks_db[task_id] = {
         "id": task_id,
@@ -48,21 +49,154 @@ async def create_task(
     return tasks_db[task_id]
 
 
-@router.get("/", response_model=List[TaskResponse])
-async def get_all_tasks(current_user: UserInDB = Depends(get_current_user)):
+@router.get("/", response_model=Dict[str, Any])
+async def get_all_tasks(
+    current_user: UserInDB = Depends(get_current_user),
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Filter by status (comma-separated: todo,in_progress,done)",
+        examples=["todo,in_progress"],
+    ),
+    search: Optional[str] = Query(
+        None,
+        description="Search in title and description (case-insensitive)",
+        examples=["documentation"],
+    ),
+    search_fields: Optional[str] = Query(
+        "title,description",
+        description="Fields to search in: title, description, or both",
+    ),
+    sort_by: Optional[str] = Query(
+        "created_at",
+        description="Sort by: created_at, title, status, updated_at",
+    ),
+    sort_direction: Optional[SortDirection] = Query(
+        "desc",
+        description="Sort direction: asc or desc",
+    ),
+    page: Optional[int] = Query(1, ge=1, description="Page number (1-based)"),
+    limit: Optional[int] = Query(
+        10, ge=1, le=100, description="Items per page (max 100)"
+    ),
+):
     """
-    Get all tasks belonging to current user.
+    Get all tasks belonging to current user with advanced filtering, search, sorting, and pagination.
 
     Requires:
         - Valid JWT token in Authorization header (Bearer token)
 
+    Query Parameters:
+        - **status**: Filter by task status (comma-separated for multiple)
+          - Example: `?status=todo` or `?status=todo,in_progress`
+        - **search**: Search in title and description (case-insensitive)
+          - Example: `?search=documentation`
+        - **search_fields**: Fields to search in (default: title,description)
+          - Options: title, description, or both
+        - **sort_by**: Sort by field (default: created_at)
+          - Options: created_at, title, status, updated_at
+        - **sort_direction**: Sort direction (default: desc)
+          - Options: asc, desc
+        - **page**: Page number for pagination (default: 1)
+        - **limit**: Items per page, max 100 (default: 10)
+
     Returns:
-        List of TaskResponse objects for current user
+        {
+            "data": [TaskResponse, ...],
+            "pagination": {
+                "total": 25,
+                "page": 1,
+                "limit": 10,
+                "pages": 3,
+                "has_more": true
+            }
+        }
+
+    Examples:
+        - GET /tasks/ - Get all user's tasks
+        - GET /tasks/?status=in_progress - Get active tasks
+        - GET /tasks/?search=documentation - Search tasks
+        - GET /tasks/?status=done&sort_by=updated_at&sort_direction=asc - Completed tasks, sorted
+        - GET /tasks/?search=bug&page=2&limit=5 - Paginated search results
     """
+    try:
+        filter_params = TaskFilterParams(
+            status=status_filter,
+            search=search,
+            search_fields=search_fields,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            page=page,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Get all tasks for current user
     user_tasks = [
         task for task in tasks_db.values() if task["user_id"] == current_user.id
     ]
-    return user_tasks
+
+    # Filter by status (Task 19)
+    if filter_params.status:
+        status_list = [s.strip() for s in filter_params.status.split(",")]
+        user_tasks = [task for task in user_tasks if task["status"] in status_list]
+
+    # Search (Task 20)
+    if filter_params.search:
+        search_lower = filter_params.search.lower()
+        search_field_list = [
+            f.strip()
+            for f in (filter_params.search_fields or "title,description").split(",")
+        ]
+
+        filtered = []
+        for task in user_tasks:
+            match = False
+            if "title" in search_field_list and search_lower in task["title"].lower():
+                match = True
+            if "description" in search_field_list and task.get("description"):
+                if search_lower in task["description"].lower():
+                    match = True
+            if match:
+                filtered.append(task)
+        user_tasks = filtered
+
+    # Sort
+    sort_dir = (
+        filter_params.sort_direction.value
+        if hasattr(filter_params.sort_direction, "value")
+        else filter_params.sort_direction
+    )
+    try:
+        user_tasks.sort(
+            key=lambda x: x.get(filter_params.sort_by, ""),
+            reverse=(sort_dir == "desc"),
+        )
+    except (KeyError, TypeError):
+        user_tasks.sort(
+            key=lambda x: x.get("created_at", datetime.now(timezone.utc)),
+            reverse=(sort_dir == "desc"),
+        )
+
+    # Pagination
+    total = len(user_tasks)
+    page = filter_params.page if filter_params.page is not None else 1
+    limit = filter_params.limit if filter_params.limit is not None else 10
+    offset = (page - 1) * limit
+    items = user_tasks[offset : offset + limit]
+    pages = math.ceil(total / limit) if total > 0 else 1
+
+    return {
+        "data": items,
+        "pagination": {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages,
+            "has_more": page < pages,
+        },
+    }
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
@@ -113,7 +247,6 @@ async def update_task(
         404 Not Found: If task doesn't exist
         403 Forbidden: If user is not the task owner
     """
-    # Update fields
     if task_update.title is not None:
         task["title"] = task_update.title
 
@@ -127,9 +260,7 @@ async def update_task(
             else task_update.status
         )
 
-    # Update timestamp
-    task["updated_at"] = datetime.utcnow()
-
+    task["updated_at"] = datetime.now(timezone.utc)
     return task
 
 
@@ -158,5 +289,5 @@ async def delete_task(
     del tasks_db[task_id]
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"message": f"Task {task_id} deleted successfully"},
+        content={"message": f"Task {task_id} deleted"},
     )
