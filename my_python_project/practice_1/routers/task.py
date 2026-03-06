@@ -9,7 +9,7 @@ from schemas.user import UserInDB
 from schemas.query import TaskFilterParams, SortDirection
 from dependencies.user import get_current_user
 from dependencies.task import get_task_or_404
-from db.storage import tasks_db, task_id_counter
+from db.storage import tasks_db, task_id_counter, projects_db
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -291,3 +291,60 @@ async def delete_task(
         status_code=status.HTTP_200_OK,
         content={"message": f"Task {task_id} deleted"},
     )
+
+
+@router.post("/{task_id}/project/{project_id}", response_model=TaskResponse)
+async def assign_task_to_project(
+    task_id: int,
+    project_id: int,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    """
+    Assign task to project.
+
+    Requires:
+        - Valid JWT token in Authorization header (Bearer token)
+        - User must own both the task and the project
+
+    Args:
+        task_id: ID of the task to assign (path parameter)
+        project_id: ID of the project to assign to (path parameter)
+
+    Returns:
+        Updated TaskResponse with project_id set
+
+    Raises:
+        404 Not Found: If task or project doesn't exist
+        403 Forbidden: If user is not the owner of task or project
+    """
+    # Verify task exists and user owns it
+    task = tasks_db.get(task_id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task {task_id} not found",
+        )
+    if task["user_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this task",
+        )
+
+    # Verify project exists and user owns it
+    project = projects_db.get(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    if project["user_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this project",
+        )
+
+    # Assign task to project
+    task["project_id"] = project_id
+    task["updated_at"] = datetime.now(timezone.utc)
+
+    return task
