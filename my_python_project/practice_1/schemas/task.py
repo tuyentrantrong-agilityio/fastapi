@@ -55,6 +55,7 @@ class TaskResponse(BaseModel):
     title: str
     description: Optional[str]
     status: TaskStatus
+    project_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -67,6 +68,7 @@ class TaskResponse(BaseModel):
                 "title": "Complete project documentation",
                 "description": "Write comprehensive API documentation",
                 "status": "in_progress",
+                "project_id": 1,
                 "created_at": "2026-03-03T10:30:00",
                 "updated_at": "2026-03-03T10:30:00",
             }
