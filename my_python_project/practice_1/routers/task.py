@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, Query, HTTPException
+from fastapi import APIRouter, status, Depends, Query
 from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
@@ -7,6 +7,7 @@ import math
 from schemas.task import TaskCreate, TaskUpdate, TaskResponse
 from schemas.user import UserInDB
 from schemas.query import TaskFilterParams, SortDirection
+from core.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from dependencies.user import get_current_user
 from dependencies.task import get_task_or_404
 from db.storage import tasks_db, task_id_counter, projects_db
@@ -130,7 +131,7 @@ async def get_all_tasks(
             limit=limit,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestException(str(e))
 
     # Get all tasks for current user
     user_tasks = [
@@ -320,28 +321,16 @@ async def assign_task_to_project(
     # Verify task exists and user owns it
     task = tasks_db.get(task_id)
     if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found",
-        )
+        raise NotFoundException("Task", task_id)
     if task["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this task",
-        )
+        raise ForbiddenException("You don't have permission to access this task")
 
     # Verify project exists and user owns it
     project = projects_db.get(project_id)
     if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project {project_id} not found",
-        )
+        raise NotFoundException("Project", project_id)
     if project["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this project",
-        )
+        raise ForbiddenException("You don't have permission to access this project")
 
     # Assign task to project
     task["project_id"] = project_id
