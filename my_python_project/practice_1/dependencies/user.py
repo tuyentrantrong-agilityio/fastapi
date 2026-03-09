@@ -1,6 +1,7 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 
 from core.security import oauth2_scheme, decode_token
+from core.exceptions import UnauthorizedException, ForbiddenException
 from schemas.user import UserInDB
 from db.storage import users_db
 
@@ -16,24 +17,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         UserInDB: User object from database
 
     Raises:
-        HTTPException 401: If token is invalid, expired, or user not found
+        UnauthorizedException: If token is invalid, expired, or user not found
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     try:
         # Decode token to get email claim
         payload = decode_token(token)
         email: str | None = payload.get("sub")
 
         if email is None:
-            raise credentials_exception
+            raise UnauthorizedException("Invalid or expired credentials")
 
     except ValueError:
-        raise credentials_exception
+        raise UnauthorizedException("Invalid or expired credentials")
 
     # Find user by email in database
     user_data = None
@@ -43,7 +38,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
             break
 
     if user_data is None:
-        raise credentials_exception
+        raise UnauthorizedException("Invalid or expired credentials")
 
     return UserInDB(**user_data)
 
@@ -61,12 +56,9 @@ async def get_admin_user(
         UserInDB: User object if user is admin
 
     Raises:
-        HTTPException 403: If user is not admin
+        ForbiddenException: If user is not admin
     """
     if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. Admin access required.",
-        )
+        raise ForbiddenException("Not enough permissions. Admin access required.")
 
     return current_user
