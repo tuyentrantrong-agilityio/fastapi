@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from core.config import settings
+from core.handlers import register_exception_handlers
 from routers import user, task, project
 
 app = FastAPI(
@@ -8,6 +9,9 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.DEBUG,
 )
+
+# Register global exception handlers
+register_exception_handlers(app)
 
 # Include routers
 app.include_router(user.router)
