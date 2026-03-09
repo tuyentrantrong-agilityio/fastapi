@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, HTTPException, Depends
+from fastapi import APIRouter, status, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
@@ -6,6 +6,11 @@ from datetime import timedelta
 from schemas.user import UserCreate, UserResponse, UserUpdate, Token, UserInDB
 from core.hashing import hash_password, verify_password
 from core.security import create_access_token
+from core.exceptions import (
+    BadRequestException,
+    UnauthorizedException,
+    ForbiddenException,
+)
 from dependencies.user import get_current_user, get_admin_user
 from db.storage import users_db, user_id_counter
 
@@ -27,10 +32,7 @@ async def register(user: UserCreate):
     # Check if email already exists
     for user_data in users_db.values():
         if user_data["email"] == user.email:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": "Email already registered"},
-            )
+            raise BadRequestException("Email already registered")
 
     # Create new user
     user_id = user_id_counter["id"]
@@ -75,11 +77,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not user_data or not verify_password(
         form_data.password, user_data["hashed_password"]
     ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedException("Invalid email or password")
 
     # Generate JWT token
     access_token_expires = timedelta(minutes=30)
@@ -129,10 +127,7 @@ async def update_profile(
         # Check if email already exists
         for uid, user_data in users_db.items():
             if uid != user_id and user_data["email"] == user_update.email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already taken",
-                )
+                raise BadRequestException("Email already taken")
         users_db[user_id]["email"] = user_update.email
 
     # Update password if provided
@@ -142,15 +137,9 @@ async def update_profile(
     # Update role if provided and user is admin
     if user_update.role is not None:
         if current_user.role != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin users can change roles",
-            )
+            raise ForbiddenException("Only admin users can change roles")
         if user_update.role not in ["user", "admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Role must be 'user' or 'admin'",
-            )
+            raise BadRequestException("Role must be 'user' or 'admin'")
         users_db[user_id]["role"] = user_update.role
 
     # Return updated user
