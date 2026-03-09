@@ -1,7 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from typing import Dict, Any
 
 from schemas.user import UserInDB
+from core.exceptions import NotFoundException, ForbiddenException
 from dependencies.user import get_current_user
 from db.storage import tasks_db
 
@@ -20,22 +21,16 @@ async def get_task_or_404(
         Task data dictionary
 
     Raises:
-        HTTPException 404: If task not found
-        HTTPException 403: If user is not the task owner
+        NotFoundException: If task not found
+        ForbiddenException: If user is not the task owner
     """
     task = tasks_db.get(task_id)
 
     if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task with id {task_id} not found",
-        )
+        raise NotFoundException("Task", task_id)
 
     # Verify ownership
     if task["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this task",
-        )
+        raise ForbiddenException("You don't have permission to access this task")
 
     return task

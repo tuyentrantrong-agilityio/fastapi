@@ -80,3 +80,14 @@ class PaginationMeta(BaseModel):
     limit: int = Field(..., description="Items per page")
     pages: int = Field(..., description="Total number of pages")
     has_more: bool = Field(..., description="Whether there are more pages")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "total": 100,
+                "page": 1,
+                "limit": 10,
+                "pages": 10,
+                "has_more": True,
+            }
+        }
