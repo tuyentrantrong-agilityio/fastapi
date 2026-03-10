@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, Depends
 from datetime import datetime, timezone
 from typing import List
 
-from schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from schemas.project import ProjectCreate, ProjectResponse
 from schemas.user import UserInDB
 from dependencies.user import get_current_user
 from db.storage import projects_db, project_id_counter

@@ -5,7 +5,7 @@ This module provides centralized error handling for the FastAPI application,
 ensuring consistent error response formats across all endpoints.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from core.exceptions import ApplicationException
 import logging
@@ -56,6 +56,51 @@ def register_exception_handlers(app: FastAPI):
                     "message": exc.message,
                     "detail": exc.detail,
                     "status_code": exc.status_code,
+                },
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """
+        Handle HTTPException (e.g., from OAuth2PasswordBearer authentication).
+
+        Converts HTTPException to standardized JSON error response format.
+        This catches "Not authenticated" errors from OAuth2PasswordBearer.
+
+        Args:
+            request: The incoming HTTP request
+            exc: The HTTPException that was raised
+
+        Returns:
+            JSONResponse with error details in standardized format
+        """
+        # Convert "Not authenticated" to our standard format
+        if exc.status_code == 403 and "Not authenticated" in str(exc.detail):
+            status_code = 401
+            message = "Unauthorized"
+            detail = "Missing or invalid authentication credentials"
+        else:
+            status_code = exc.status_code
+            message = exc.detail
+            detail = exc.detail
+
+        logger.warning(
+            f"HTTP exception: {message}",
+            extra={
+                "status_code": status_code,
+                "detail": detail,
+                "path": request.url.path,
+            },
+        )
+
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "error": {
+                    "message": message,
+                    "detail": detail,
+                    "status_code": status_code,
                 },
             },
         )
