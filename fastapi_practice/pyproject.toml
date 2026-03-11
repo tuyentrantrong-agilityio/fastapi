@@ -1,0 +1,18 @@
+[project]
+name = "python-practice"
+version = "1.0.0"
+description = "FastAPI Task Management Application with authentication and RBAC"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.128.0",
+    "uvicorn[standard]==0.30.0",
+    "pydantic==2.12.5",
+    "passlib[bcrypt]==1.7.4",
+    "python-jose[cryptography]==3.3.0",
+    "argon2-cffi==23.1.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
