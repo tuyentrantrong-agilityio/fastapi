@@ -134,10 +134,12 @@ async def update_profile(
     if user_update.password is not None:
         users_db[user_id]["hashed_password"] = hash_password(user_update.password)
 
-    # Update role if provided and user is admin
+    # Update role if provided (only admin can change roles to different value)
     if user_update.role is not None:
-        if current_user.role != "admin":
-            raise ForbiddenException("Only admin users can change roles")
+        # Only admin can change role to a different value
+        if user_update.role != current_user.role:
+            if current_user.role != "admin":
+                raise ForbiddenException("Only admin users can change roles")
         if user_update.role not in ["user", "admin"]:
             raise BadRequestException("Role must be 'user' or 'admin'")
         users_db[user_id]["role"] = user_update.role
