@@ -22,7 +22,7 @@ app.include_router(project.router)
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to Practice 1 API",
+        "message": "Welcome to FastAPI Practice API",
         "debug": settings.DEBUG,
         "docs": "/docs",
     }

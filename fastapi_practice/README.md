@@ -1,41 +1,48 @@
-# Practice 1 - FastAPI Task Management Application
+# FastAPI Task Management Application
 
-A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, and role-based access control with extensive test coverage.
+A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 49 comprehensive unit tests.
 
-## 📋 Overview
+## Overview
 
-**Practice 1** is a production-like task management API built with FastAPI, featuring:
-- **User Authentication** - Registration, login with JWT tokens
-- **Password Security** - Argon2id hashing (no length limitations)
-- **Task Management** - Full CRUD operations with filtering, search, and pagination
-- **Authorization** - Role-based access control (user vs admin)
-- **Task Ownership** - Users can only access/modify their own tasks
-- **Comprehensive Testing** - 49 unit tests covering all major functionality
-- **Professional Structure** - Modular architecture with clear separation of concerns
+This project builds a production-like task management API with:
+- User authentication and authorization with JWT tokens
+- Secure password hashing using Argon2id (OWASP recommended)
+- Full CRUD operations for tasks with filtering, search, and pagination
+- Role-based access control (user vs admin)
+- Task ownership enforcement (users can only access their own tasks)
+- 49 unit tests covering all major functionality
+- Modular architecture with clear separation of concerns
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| **Web Framework** | FastAPI | 0.128.0 |
-| **ASGI Server** | Uvicorn | Latest |
-| **Data Validation** | Pydantic | 2.12.5 |
-| **Security/Hashing** | Argon2-cffi | Latest |
-| **JWT Tokens** | python-jose | Latest |
-| **Testing** | Pytest | 9.0.2 |
-| **Async Testing** | pytest-asyncio | 1.3.0 |
-| **HTTP Client** | httpx | 0.28.1 |
-| **Python** | 3.11+ | - |
+- **FastAPI** 0.128.0 - Fast, modern web framework
+- **Uvicorn** - ASGI server
+- **Pydantic** 2.12.5 - Data validation and settings management
+- **Argon2-cffi** - Secure password hashing
+- **python-jose** - JWT token generation and validation
+- **Pytest** 9.0.2 - Testing framework
+- **httpx** 0.28.1 - Async HTTP client for testing
+- **Python** 3.11+
 
-## ⚡ Quick Start
+## Installation
 
-### **1. Clone Repository**
+### Prerequisites
+
+Before you begin, ensure you have the following installed:
+- Python 3.11 or higher
+- pip (Python package manager)
+
+### Quick Start
+
+#### 1. Clone Repository and Navigate
+
 ```bash
 git clone <repository-url>
-cd python-practice
+cd fastapi_practice
 ```
 
-### **2. Create Virtual Environment**
+#### 2. Create Virtual Environment
+
 ```bash
 # Windows
 python -m venv venv
@@ -46,501 +53,223 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### **3. Install Dependencies**
+#### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### **4. Run Application**
+#### 4. Create Environment File
+
+Copy the example environment file and configure it:
+
 ```bash
-# Using main.py
-python main.py
-
-# Or using uvicorn directly
-uvicorn app.main:app --reload
-
-# Or using run script (macOS/Linux)
-./run.sh
+cp .env.example .env
 ```
 
-### **5. Access API Documentation**
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+Edit `.env` file (optional - defaults are set in config.py):
 
-### **6. Run Tests**
-```bash
-pytest tests/
-# With verbose output
-pytest tests/ -v
-```
-
-## 📁 Project Structure
-
-```
-python-practice/
-├── app/                         # Main application package
-│   ├── __init__.py             # Package initialization
-│   ├── main.py                 # FastAPI app instance & setup
-│   │
-│   ├── core/                   # Core utilities
-│   │   ├── __init__.py
-│   │   ├── config.py           # Settings & configuration
-│   │   ├── hashing.py          # Password hashing (argon2id)
-│   │   ├── security.py         # JWT token management
-│   │   ├── exceptions.py       # Custom exception classes
-│   │   └── handlers.py         # Global exception handlers
-│   │
-│   ├── db/                     # Database layer
-│   │   ├── __init__.py
-│   │   ├── storage.py          # In-memory storage (dicts)
-│   │   └── migrations/         # Migration scripts (if needed)
-│   │
-│   ├── models/                 # Database/Domain models
-│   │   ├── __init__.py
-│   │   ├── user.py            # User model
-│   │   ├── task.py            # Task model
-│   │   └── project.py         # Project model
-│   │
-│   ├── schemas/                # Pydantic models (validation)
-│   │   ├── __init__.py
-│   │   ├── user.py            # User request/response schemas
-│   │   ├── task.py            # Task schemas
-│   │   ├── project.py         # Project schemas
-│   │   └── query.py           # Query parameter schemas
-│   │
-│   ├── routers/                # API route handlers
-│   │   ├── __init__.py
-│   │   ├── user.py            # /users endpoints (register, login, profile)
-│   │   ├── task.py            # /tasks endpoints (CRUD + filtering)
-│   │   └── project.py         # /projects endpoints (CRUD)
-│   │
-│   ├── services/               # Business logic layer
-│   │   ├── __init__.py
-│   │   ├── user_service.py    # User business logic
-│   │   └── task_service.py    # Task business logic
-│   │
-│   └── dependencies/           # FastAPI dependency injection
-│       ├── __init__.py
-│       ├── user.py            # get_current_user, get_admin_user
-│       └── task.py            # get_task_or_404
-│
-├── tests/                      # Test suite
-│   ├── __init__.py
-│   ├── conftest.py            # Pytest fixtures
-│   ├── test_main.py           # Main endpoint tests
-│   ├── test_users.py          # User endpoint tests
-│   ├── test_tasks.py          # Task endpoint tests
-│   └── test_projects.py       # Project endpoint tests
-│
-├── main.py                     # Application entry point
-├── requirements.txt            # Python dependencies
-├── .env                        # Environment variables
-├── .gitignore                  # Git ignore rules
-├── .python-version             # Python version
-├── pyproject.toml              # Project configuration
-├── pyrightconfig.json          # Pyright configuration
-├── run.sh                      # Start script (Unix/Mac)
-├── run.bat                     # Start script (Windows)
-└── README.md                   # This file
-```
-
-## 🚀 Setup Instructions for Developers
-```bash
-source venv/bin/activate
-```
-
-4. **Install dependencies**
-```bash
-pip install fastapi uvicorn pydantic pydantic-settings passlib argon2-cffi python-jose cryptography pytest pytest-asyncio httpx
-```
-
-Or from requirements (if exists):
-```bash
-pip install -r requirements.txt
-```
-
-5. **Create .env file**
 ```env
-SECRET_KEY=your-secret-key-here-change-in-production
+SECRET_KEY=your-secret-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ALGORITHM=HS256
 DEBUG=True
 ```
 
-## 🔧 Running the Application
-
-### Development Server
+#### 5. Run Application
 
 ```bash
-python -m uvicorn main:app --reload
+# Option 1: Using uvicorn directly
+uvicorn app.main:app --reload
+
+# Option 2: Using run script (macOS/Linux)
+./run.sh
+
+# Option 3: Windows batch file
+run.bat
 ```
 
-**Output:**
+#### 6. Access Application
+
+- API Documentation (Swagger UI): http://localhost:8000/docs
+- Alternative Docs (ReDoc): http://localhost:8000/redoc
+
+## Project Structure
+
 ```
-Uvicorn running on http://127.0.0.1:8000
-Press CTRL+C to quit
+fastapi_practice/
+├── app/                          # Main application package
+│   ├── __init__.py              # Package initialization
+│   ├── main.py                  # FastAPI app setup and configuration
+│   │
+│   ├── core/                    # Core utilities and configuration
+│   │   ├── __init__.py
+│   │   ├── config.py            # Settings and environment variables
+│   │   ├── hashing.py           # Password hashing using Argon2id
+│   │   ├── security.py          # JWT token generation and verification
+│   │   ├── exceptions.py        # Custom exception classes
+│   │   └── handlers.py          # Global exception handlers
+│   │
+│   ├── db/                      # Database layer
+│   │   ├── __init__.py
+│   │   └── storage.py           # In-memory storage (dictionaries)
+│   │
+│   ├── models/                  # Database/Domain models
+│   │   └── __init__.py          # User, Task, Project models
+│   │
+│   ├── schemas/                 # Pydantic validation models
+│   │   ├── __init__.py
+│   │   ├── user.py             # User request/response schemas
+│   │   ├── task.py             # Task schemas
+│   │   ├── project.py          # Project schemas
+│   │   └── query.py            # Query parameter schemas
+│   │
+│   ├── routers/                 # API route handlers
+│   │   ├── __init__.py
+│   │   ├── user.py             # /users endpoints (register, login, profile, update)
+│   │   ├── task.py             # /tasks endpoints (CRUD, filtering, pagination)
+│   │   └── project.py          # /projects endpoints (CRUD)
+│   │
+│   ├── services/                # Business logic layer
+│   │   ├── __init__.py
+│   │   ├── user_service.py     # User business logic
+│   │   ├── task_service.py     # Task business logic
+│   │   └── project_service.py  # Project business logic
+│   │
+│   └── dependencies/            # FastAPI dependency injection
+│       ├── __init__.py
+│       ├── user.py             # get_current_user, get_admin_user
+│       └── task.py             # get_task_or_404
+│
+├── tests/                       # Test suite
+│   ├── __init__.py
+│   ├── conftest.py             # Pytest fixtures and configuration
+│   ├── test_auth.py            # User authentication tests (19 tests)
+│   ├── test_tasks.py           # Task CRUD tests (18 tests)
+│   └── test_auth_errors.py     # Authorization and error handling tests (12 tests)
+│
+├── requirements.txt             # Python dependencies
+├── .env.example                # Example environment variables
+├── .gitignore                  # Git ignore rules
+├── pyproject.toml              # Project metadata
+├── pyrightconfig.json          # Pyright type checking config
+├── run.sh                      # Start script for macOS/Linux
+├── run.bat                     # Start script for Windows
+└── README.md                   # This file
 ```
 
-**Access:**
-- 📚 **API Docs (Swagger UI)**: http://localhost:8000/docs
-- 📖 **Alternative Docs (ReDoc)**: http://localhost:8000/redoc
-- 🏠 **Home**: http://localhost:8000/
+## API Endpoints
 
-### Production Server
+All authenticated endpoints require a JWT access token:
+```
+Authorization: Bearer <your-access-token>
+```
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | /users/register | Register new user | ❌ |
+| POST | /users/login | Login & get token | ❌ |
+| GET | /users/me | Get current profile | ✅ |
+| PUT | /users/me | Update profile | ✅ |
+| POST | /tasks | Create task | ✅ |
+| GET | /tasks | List my tasks | ✅ |
+| GET | /tasks/{id} | Get task details | ✅ |
+| PUT | /tasks/{id} | Update task | ✅ |
+| DELETE | /tasks/{id} | Delete task | ✅ |
+| POST | /projects | Create project | ✅ |
+| GET | /projects | List my projects | ✅ |
+
+**Query Parameters for Task List:**
+- `?status=todo` - Filter by status (todo, in_progress, done)
+- `?search=keyword` - Search by task title
+- `?page=1` - Pagination (default: page 1)
+- `?limit=10` - Items per page (default: 10)
+
+### Example Requests
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Register User
+POST /users/register
+Body: {"email": "user@example.com", "password": "SecurePass123!"}
+
+# Login
+POST /users/login
+Body: username=user@example.com&password=SecurePass123!
+
+# Create Task
+POST /tasks
+Headers: Authorization: Bearer <access-token>
+Body: {"title": "Learn FastAPI", "description": "Complete the tutorial", "status": "todo"}
+
+# List Tasks
+GET /tasks?status=todo&search=FastAPI&page=1&limit=10
+Headers: Authorization: Bearer <access-token>
 ```
 
-## 🧪 Testing
-
-### Run All Tests
+## Running Tests
 
 ```bash
+# Run all tests
 pytest tests/ -v
-```
 
-**Output:**
-```
-tests/test_auth.py ..................      [ 36%]
-tests/test_auth_errors.py ..............  [ 65%]
-tests/test_tasks.py .................     [100%]
-
-===================== 49 passed, 13 warnings in 2.34s =====================
-```
-
-### Run Specific Test File
-
-```bash
-# Authentication tests only
+# Run specific test file
 pytest tests/test_auth.py -v
 
-# Task CRUD tests only
-pytest tests/test_tasks.py -v
-
-# Error handling tests only
-pytest tests/test_auth_errors.py -v
-```
-
-### Run Specific Test Class or Function
-
-```bash
-# Single test class
-pytest tests/test_auth.py::TestRegister -v
-
-# Single test function
+# Run specific test
 pytest tests/test_auth.py::TestRegister::test_register_success -v
+
+# Generate coverage report
+pytest tests/ --cov=app --cov-report=html
 ```
 
-### Run with Coverage
-
-```bash
-pytest tests/ --cov=core --cov=routers --cov=schemas --cov=dependencies
-```
-
-### Run with Detailed Output
-
-```bash
-pytest tests/ -vv --tb=long
-```
-
-## 📝 Test Coverage
-
-| Module | Test File | Test Count | Coverage |
-|--------|-----------|-----------|----------|
-| **Authentication** | test_auth.py | 19 | Register, Login, Profile, Protected endpoints |
-| **Task CRUD** | test_tasks.py | 18 | Create, Read, Update, Delete, Pagination |
-| **Authorization** | test_auth_errors.py | 12 | Ownership, Permissions, Error handling |
-| **Total** | **49 tests** | **All major features** | ✅ |
-
-## 🔐 API Endpoints
-
-### User Management
-
-```bash
-# Register new user
-POST /users/register
-Body: {"email": "user@example.com", "password": "pass1234"}
-Response: 201 Created
-
-# Login (get JWT token)
-POST /users/login
-Body: username=user@example.com&password=pass1234
-Response: {"access_token": "...", "token_type": "bearer"}
-
-# Get current user profile
-GET /users/me
-Headers: Authorization: Bearer <token>
-Response: {"id": 1, "email": "user@example.com", "role": "user"}
-
-# Update user profile
-PUT /users/me
-Headers: Authorization: Bearer <token>
-Body: {"email": "newemail@example.com", "password": "newpass1234"}
-Response: {"id": 1, "email": "newemail@example.com", "role": "user"}
-```
-
-### Task Management
-
-```bash
-# Create task
-POST /tasks
-Headers: Authorization: Bearer <token>
-Body: {"title": "Learn FastAPI", "description": "Complete the course", "status": "todo"}
-Response: 201 Created with task data
-
-# Get all tasks (with filtering & pagination)
-GET /tasks?status=todo&search=keyword&page=1&limit=10
-Headers: Authorization: Bearer <token>
-Response: {"data": [...], "pagination": {...}}
-
-# Get single task
-GET /tasks/{id}
-Headers: Authorization: Bearer <token>
-Response: Task details
-
-# Update task
-PUT /tasks/{id}
-Headers: Authorization: Bearer <token>
-Body: {"title": "Updated Title", "status": "done"}
-Response: Updated task
-
-# Delete task
-DELETE /tasks/{id}
-Headers: Authorization: Bearer <token>
-Response: 200 OK
-```
-
-### Project Management
-
-```bash
-# Create project
-POST /projects
-Headers: Authorization: Bearer <token>
-Body: {"name": "My Project", "description": "Project description"}
-Response: 201 Created
-
-# Get projects
-GET /projects
-Headers: Authorization: Bearer <token>
-Response: List of user's projects
-```
-
-## 🔑 Key Features
-
-### Authentication Flow
-
-```
-User Registration → Password Hashing (Argon2id) → DB Storage
-                   ↓
-User Login → Verify Password → Generate JWT Token
-            ↓
-Protected Endpoints ← Token Validation ← Get Current User
-```
-
-### Password Security
-
-- **Algorithm**: Argon2id (OWASP recommended)
-- **Length**: No limitations (unlike bcrypt's 72-byte limit)
-- **Hashing**: One-way irreversible hashing
-- **Verification**: Constant-time comparison
-
-### Authorization
-
-- **Role-Based Access Control (RBAC)**
-  - `user` - Standard user role
-  - `admin` - Administrative privileges
-  
-- **Task Ownership**
-  - Each task has `user_id`
-  - Users can only access their own tasks
-  - Enforced at dependency level
-
-### Error Handling
-
-All errors return standardized JSON format:
-
-```json
-{
-  "error": {
-    "message": "User not found",
-    "detail": "User with id 999 not found",
-    "status_code": 404
-  }
-}
-```
-
-Status Codes:
-- `200` - OK
-- `201` - Created
-- `400` - Bad Request
-- `401` - Unauthorized
-- `403` - Forbidden
-- `404` - Not Found
-- `409` - Conflict
-- `500` - Internal Server Error
-
-## 📚 API Documentation
-
-### Quick Start
-See [GUIDE.md](GUIDE.md) for a quick reference guide.
-
-### Complete Documentation
-See [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for detailed documentation.
-
-## 🧑‍💻 Development Workflow
-
-### 1. Start Development Server
-
-```bash
-python -m uvicorn main:app --reload
-```
-
-### 2. Access Swagger UI
-
-Open http://localhost:8000/docs
-
-### 3. Authorize (for testing protected endpoints)
-
-- Click **"Authorize"** button
-- Enter credentials:
-  - **username**: user@example.com
-  - **password**: pass1234
-- Click **"Authorize"**
-
-### 4. Test Endpoints
-
-Try out any endpoint in Swagger UI
-
-### 5. Run Tests
-
-```bash
-pytest tests/ -v
-```
-
-## 🛡️ Security Considerations
-
-| Aspect | Implementation |
-|--------|----------------|
-| **Password Hashing** | Argon2id (OWASP recommended) |
-| **Tokens** | JWT with HS256 signature |
-| **Token Expiry** | 30 minutes (configurable) |
-| **Input Validation** | Pydantic with email verification |
-| **SQL Injection** | N/A (in-memory storage) |
-| **CORS** | Not enabled (for learning) |
-
-## 🐛 Troubleshooting
-
-### "Not authenticated" Error
-
-**Problem**: Endpoints return 401 when testing without token
-
-**Solution**: 
-1. Register user: `POST /users/register`
-2. Login: `POST /users/login` (get token)
-3. Authorize in Swagger UI with token
-4. Try endpoint again
-
-### Password Too Long Error
-
-**Problem**: Old bcrypt implementation with 72-byte limit
-
-**Solution**: Already fixed! Using Argon2id now (unlimited length)
-
-### Token Expired
-
-**Problem**: JWT token expired (default 30 minutes)
-
-**Solution**: Login again to get new token
-
-### Task Not Found
-
-**Problem**: User trying to access another user's task
-
-**Solution**: Users can only access tasks they created
-
-## 📦 Dependencies
-
-Key dependencies and their purposes:
-
-```python
-# Web framework
-fastapi==0.128.0           # Web framework
-uvicorn                    # ASGI server
-
-# Data validation
-pydantic==2.12.5          # Request/response validation
-pydantic-settings         # Settings management
-email-validator           # Email validation
-
-# Security
-argon2-cffi               # Password hashing
-python-jose               # JWT token handling
-cryptography              # Cryptographic operations
-
-# Testing
-pytest==9.0.2            # Testing framework
-pytest-asyncio==1.3.0    # Async test support
-httpx==0.28.1            # Async HTTP client
-```
-
-## 📋 Environment Variables
+**Test Coverage** (49 tests):
+- Authentication: 19 tests (Register, Login, Profile, Token Management)
+- Task CRUD: 18 tests (Create, Read, Update, Delete, Filtering, Pagination)
+- Authorization: 12 tests (Ownership, Permissions, Error Handling)
+
+## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SECRET_KEY` | dev-key | JWT signing key (change in production) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | Token expiry time in minutes |
 | `ALGORITHM` | HS256 | JWT algorithm |
-| `DEBUG` | False | Debug mode (True for development) |
+| `DEBUG` | False | Debug mode |
 
-## 🎯 Learning Outcomes
+## Troubleshooting
 
-After studying this project, you'll understand:
+### "Not authenticated" Error
 
-1. ✅ **FastAPI Fundamentals** - Routing, validation, responses
-2. ✅ **Authentication** - JWT tokens, password hashing, OAuth2
-3. ✅ **Authorization** - Role-based access, ownership verification
-4. ✅ **Database Design** - User-owned resources, relationships
-5. ✅ **Filtering & Search** - Multi-parameter filtering, pagination
-6. ✅ **Error Handling** - Custom exceptions, standardized responses
-7. ✅ **Testing** - Unit tests, fixtures, mocking
-8. ✅ **Security** - Password hashing, token validation
-9. ✅ **Modular Architecture** - Separation of concerns
-10. ✅ **Professional Practices** - Code organization, documentation
+**Problem**: Endpoints return 401 Unauthorized
 
-## 🚀 Next Steps
+**Solution**:
+1. Register user: `POST /users/register`
+2. Login: `POST /users/login` (receive access_token)
+3. Use token in Authorization header: `Authorization: Bearer <token>`
+4. Test endpoint again
 
-### Extend the Project
+### Token Expired
 
-1. **Database**: Replace in-memory with PostgreSQL + SQLAlchemy
-2. **Email**: Add email verification and password reset
-3. **Caching**: Add Redis for token blacklist
-4. **Logging**: Implement structured logging
-5. **Deployment**: Docker, cloud platforms (Heroku, AWS)
-6. **Frontend**: React/Vue UI for the API
+**Problem**: JWT token expired (usually after 30 minutes)
 
-### Deepen Your Learning
+**Solution**: Login again to get a new access token
 
-1. Learn async/await patterns
-2. Understand JWT security implications
-3. Study OWASP security guidelines
-4. Explore database migrations
-5. Learn about API versioning
+### Task Not Found (404)
 
-## 📞 Support
+**Problem**: Trying to access another user's task
 
-For issues or questions:
-1. Check [GUIDE.md](GUIDE.md) for quick answers
-2. Review [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for details
-3. Run tests to verify everything works
-4. Check error responses for detailed messages
+**Solution**: Users can only access tasks they created. Verify you're accessing your own resources.
 
-## 📄 License
+### Port Already in Use
 
-This is a learning project. Feel free to use it for educational purposes.
+**Problem**: Cannot run server on port 8000 (already in use)
 
----
+**Solution**:
+```bash
+# Run on different port
+uvicorn app.main:app --port 8001 --reload
+```
 
-**Last Updated**: March 10, 2026  
-**Status**: ✅ Complete & Production-Ready  
-**Test Coverage**: 49 tests passing
+## License
+
+This is a learning project for educational purposes.
