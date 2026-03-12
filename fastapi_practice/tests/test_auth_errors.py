@@ -18,9 +18,9 @@ class TestTaskOwnership:
 
         Should return 403 Forbidden.
         """
-        from db.storage import tasks_db, task_id_counter, users_db, user_id_counter
-        from core.hashing import hash_password
-        from core.security import create_access_token
+        from app.db.storage import tasks_db, task_id_counter, users_db, user_id_counter
+        from app.core.hashing import hash_password
+        from app.core.security import create_access_token
         from datetime import datetime, timezone, timedelta
 
         # Create another user
@@ -70,9 +70,9 @@ class TestTaskOwnership:
 
         Should return 403 Forbidden.
         """
-        from db.storage import tasks_db, task_id_counter, users_db, user_id_counter
-        from core.hashing import hash_password
-        from core.security import create_access_token
+        from app.db.storage import tasks_db, task_id_counter, users_db, user_id_counter
+        from app.core.hashing import hash_password
+        from app.core.security import create_access_token
         from datetime import datetime, timezone, timedelta
 
         # Create another user
@@ -123,9 +123,9 @@ class TestTaskOwnership:
 
         Should return 403 Forbidden.
         """
-        from db.storage import tasks_db, task_id_counter, users_db, user_id_counter
-        from core.hashing import hash_password
-        from core.security import create_access_token
+        from app.db.storage import tasks_db, task_id_counter, users_db, user_id_counter
+        from app.core.hashing import hash_password
+        from app.core.security import create_access_token
         from datetime import datetime, timezone, timedelta
 
         # Create another user
@@ -175,9 +175,9 @@ class TestTaskOwnership:
 
         Should return only tasks owned by current user.
         """
-        from db.storage import tasks_db, task_id_counter, users_db, user_id_counter
-        from core.hashing import hash_password
-        from core.security import create_access_token
+        from app.db.storage import tasks_db, task_id_counter, users_db, user_id_counter
+        from app.core.hashing import hash_password
+        from app.core.security import create_access_token
         from datetime import datetime, timezone, timedelta
 
         # Create another user
@@ -259,7 +259,7 @@ class TestUnauthorized:
 
         Should return 401 Unauthorized.
         """
-        from core.security import create_access_token
+        from app.core.security import create_access_token
         from datetime import timedelta
 
         # Create expired token
@@ -284,7 +284,7 @@ class TestUnauthorized:
 
         Should return 401 Unauthorized.
         """
-        from core.security import create_access_token
+        from app.core.security import create_access_token
         from datetime import timedelta
 
         # Create token for non-existent user

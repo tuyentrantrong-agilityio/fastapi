@@ -11,10 +11,10 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import timedelta
 
-from main import app
-from core.security import create_access_token
-from core.hashing import hash_password
-from db.storage import (
+from app.main import app
+from app.core.security import create_access_token
+from app.core.hashing import hash_password
+from app.db.storage import (
     users_db,
     tasks_db,
     projects_db,

@@ -133,7 +133,7 @@ class TestGetTasks:
 
         Should return 200 OK with user's tasks only.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         # Create test tasks
@@ -167,7 +167,7 @@ class TestGetTasks:
 
         Should respect page and limit parameters.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         # Create 10 test tasks
@@ -205,7 +205,7 @@ class TestGetTasks:
 
         Should return 200 OK with task data.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]
@@ -256,7 +256,7 @@ class TestUpdateTask:
 
         Should return 200 OK with updated data.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]
@@ -288,7 +288,7 @@ class TestUpdateTask:
 
         Should return 200 OK with new status.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]
@@ -320,7 +320,7 @@ class TestUpdateTask:
 
         Should return 200 OK with all updates applied.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]
@@ -378,7 +378,7 @@ class TestDeleteTask:
 
         Should return 200 OK with success message.
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]
@@ -427,7 +427,7 @@ class TestDeleteTask:
 
         Should return 401 Unauthorized (no token provided).
         """
-        from db.storage import tasks_db, task_id_counter
+        from app.db.storage import tasks_db, task_id_counter
         from datetime import datetime, timezone
 
         task_id = task_id_counter["id"]

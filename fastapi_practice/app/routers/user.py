@@ -4,15 +4,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 
 from ..schemas.user import UserCreate, UserResponse, UserUpdate, Token, UserInDB
-from ..core.hashing import hash_password, verify_password
+from ..core.hashing import verify_password
 from ..core.security import create_access_token
-from ..core.exceptions import (
-    BadRequestException,
-    UnauthorizedException,
-    ForbiddenException,
-)
+from ..core.exceptions import UnauthorizedException
 from ..dependencies.user import get_current_user, get_admin_user
-from ..db.storage import users_db, user_id_counter
+from ..services.user_service import (
+    create_user_service,
+    get_user_by_email_service,
+    update_user_profile_service,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -29,26 +29,7 @@ async def register(user: UserCreate):
 
     Returns: User ID and email
     """
-    # Check if email already exists
-    for user_data in users_db.values():
-        if user_data["email"] == user.email:
-            raise BadRequestException("Email already registered")
-
-    # Create new user
-    user_id = user_id_counter["id"]
-    user_id_counter["id"] += 1
-
-    hashed_password = hash_password(user.password)
-
-    users_db[user_id] = {
-        "id": user_id,
-        "email": user.email,
-        "hashed_password": hashed_password,
-        "is_active": True,
-        "role": "user",  # Default role is 'user'
-    }
-
-    return {"id": user_id, "email": user.email, "role": "user"}
+    return await create_user_service(user)
 
 
 @router.post("/login", response_model=Token)
@@ -66,12 +47,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     Raises:
         401 Unauthorized: If email not found or password invalid
     """
-    # Find user by email (OAuth2PasswordRequestForm uses 'username' field)
-    user_data = None
-    for uid, user in users_db.items():
-        if user["email"] == form_data.username:
-            user_data = user
-            break
+    # Find user by email
+    user_data = await get_user_by_email_service(form_data.username)
 
     # Validate credentials
     if not user_data or not verify_password(
@@ -120,29 +97,5 @@ async def update_profile(
     Returns:
         Updated user profile
     """
-    user_id = current_user.id
-
-    # Update email if provided
-    if user_update.email is not None:
-        # Check if email already exists
-        for uid, user_data in users_db.items():
-            if uid != user_id and user_data["email"] == user_update.email:
-                raise BadRequestException("Email already taken")
-        users_db[user_id]["email"] = user_update.email
-
-    # Update password if provided
-    if user_update.password is not None:
-        users_db[user_id]["hashed_password"] = hash_password(user_update.password)
-
-    # Update role if provided (only admin can change roles to different value)
-    if user_update.role is not None:
-        # Only admin can change role to a different value
-        if user_update.role != current_user.role:
-            if current_user.role != "admin":
-                raise ForbiddenException("Only admin users can change roles")
-        if user_update.role not in ["user", "admin"]:
-            raise BadRequestException("Role must be 'user' or 'admin'")
-        users_db[user_id]["role"] = user_update.role
-
-    # Return updated user
-    return users_db[user_id]
+    is_admin = current_user.role == "admin"
+    return await update_user_profile_service(current_user.id, user_update, is_admin)

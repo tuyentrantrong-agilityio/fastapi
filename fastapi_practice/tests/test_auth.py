@@ -216,7 +216,7 @@ class TestProtectedEndpoint:
         Should return 401 Unauthorized.
         """
         # Create an expired token (already handled by the decode_token function)
-        from core.security import create_access_token
+        from app.core.security import create_access_token
         from datetime import timedelta
 
         expired_token = create_access_token(
@@ -300,8 +300,8 @@ class TestUpdateProfile:
         Should return 400 Bad Request.
         """
         # Create another user
-        from db.storage import users_db, user_id_counter
-        from core.hashing import hash_password
+        from app.db.storage import users_db, user_id_counter
+        from app.core.hashing import hash_password
 
         other_user_id = user_id_counter["id"]
         user_id_counter["id"] += 1
