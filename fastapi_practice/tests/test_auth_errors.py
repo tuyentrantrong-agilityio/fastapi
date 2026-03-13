@@ -382,7 +382,7 @@ class TestNotFound:
 
         assert response.status_code == 404
         data = response.json()
-        assert "error" in data
+        assert "detail" in data
 
     def test_nonexistent_endpoint(self, client, auth_headers):
         """

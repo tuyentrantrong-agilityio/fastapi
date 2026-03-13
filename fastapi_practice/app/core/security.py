@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
+import secrets
+import hashlib
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -38,6 +40,35 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     )
 
     return encoded_jwt
+
+
+def generate_refresh_token() -> str:
+    """
+    Generate a secure opaque random refresh token.
+
+    Returns a random 64-character hexadecimal string that doesn't contain
+    any user data. This is stored server-side (hashed) for lookup and revocation.
+
+    Returns:
+        str: Random 64-character hexadecimal string (plain text to return to client)
+    """
+    return secrets.token_hex(32)  # 64 character hex string
+
+
+def hash_refresh_token(token: str) -> str:
+    """
+    Hash a refresh token using SHA256 (deterministic hashing).
+
+    Used for storing refresh tokens in database. Unlike password hashing (Argon2),
+    this is deterministic so we can compare tokens directly.
+
+    Args:
+        token: Plain text refresh token from generate_refresh_token()
+
+    Returns:
+        str: SHA256 hash of the token
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def decode_token(token: str) -> Dict[str, Any]:

@@ -18,6 +18,7 @@ from app.db.storage import (
     users_db,
     tasks_db,
     projects_db,
+    refresh_tokens_db,
     user_id_counter,
     task_id_counter,
     project_id_counter,
@@ -40,12 +41,14 @@ def reset_database():
     """
     Reset database before each test.
 
-    Clears all data from users_db, tasks_db, projects_db and resets ID counters.
-    This fixture runs automatically before every test to ensure clean state.
+    Clears all data from users_db, tasks_db, projects_db, refresh_tokens_db
+    and resets ID counters. This fixture runs automatically before every test
+    to ensure clean state.
     """
     users_db.clear()
     tasks_db.clear()
     projects_db.clear()
+    refresh_tokens_db.clear()
     user_id_counter["id"] = 1
     task_id_counter["id"] = 1
     project_id_counter["id"] = 1

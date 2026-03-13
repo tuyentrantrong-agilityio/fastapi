@@ -1,29 +1,31 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional
 
 
 class UserCreate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"email": "user@example.com", "password": "secure_password123"}
+        }
+    )
+
     email: EmailStr
     password: str = Field(
         ..., min_length=8, description="Password must be at least 8 characters"
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {"email": "user@example.com", "password": "secure_password123"}
-        }
-
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {"id": 1, "email": "user@example.com", "role": "user"}
+        },
+    )
+
     id: int
     email: str
     role: str = "user"
-
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {"id": 1, "email": "user@example.com", "role": "user"}
-        }
 
 
 class UserUpdate(BaseModel):
@@ -41,13 +43,30 @@ class UserInDB(UserResponse):
 class Token(BaseModel):
     """OAuth2 token response"""
 
-    access_token: str
-    token_type: str
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR...",
                 "token_type": "bearer",
             }
         }
+    )
+
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request model for refreshing access token"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR...",
+            }
+        }
+    )
+
+    refresh_token: str

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 from enum import Enum
 
@@ -75,14 +75,8 @@ class TaskFilterParams(BaseModel):
 class PaginationMeta(BaseModel):
     """Pagination metadata"""
 
-    total: int = Field(..., description="Total items matching filters")
-    page: int = Field(..., description="Current page number")
-    limit: int = Field(..., description="Items per page")
-    pages: int = Field(..., description="Total number of pages")
-    has_more: bool = Field(..., description="Whether there are more pages")
-
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "total": 100,
                 "page": 1,
@@ -91,3 +85,10 @@ class PaginationMeta(BaseModel):
                 "has_more": True,
             }
         }
+    )
+
+    total: int = Field(..., description="Total items matching filters")
+    page: int = Field(..., description="Current page number")
+    limit: int = Field(..., description="Items per page")
+    pages: int = Field(..., description="Total number of pages")
+    has_more: bool = Field(..., description="Whether there are more pages")

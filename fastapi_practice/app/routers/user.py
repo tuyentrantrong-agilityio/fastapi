@@ -1,11 +1,23 @@
 from fastapi import APIRouter, status, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 
-from ..schemas.user import UserCreate, UserResponse, UserUpdate, Token, UserInDB
+from ..schemas.user import (
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+    Token,
+    UserInDB,
+    RefreshTokenRequest,
+)
 from ..core.hashing import verify_password
-from ..core.security import create_access_token
+from ..core.security import (
+    create_access_token,
+    generate_refresh_token,
+    hash_refresh_token,
+    decode_token,
+)
 from ..core.exceptions import UnauthorizedException
 from ..dependencies.user import get_current_user, get_admin_user
 from ..services.user_service import (
@@ -13,6 +25,7 @@ from ..services.user_service import (
     get_user_by_email_service,
     update_user_profile_service,
 )
+from ..core.config import settings
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -35,13 +48,14 @@ async def register(user: UserCreate):
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
-    Login endpoint to authenticate user and get JWT access token.
+    Login endpoint to authenticate user and get JWT access token and opaque refresh token.
 
     - **username**: Email address (OAuth2PasswordRequestForm uses 'username' field)
     - **password**: User password
 
     Returns:
-        - **access_token**: JWT token to use for authenticated requests
+        - **access_token**: JWT token (expires in 30 minutes)
+        - **refresh_token**: Opaque random token (expires in 7 days)
         - **token_type**: Always "bearer"
 
     Raises:
@@ -56,13 +70,103 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     ):
         raise UnauthorizedException("Invalid email or password")
 
-    # Generate JWT token
+    # Generate JWT access token
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
         data={"sub": user_data["email"]}, expires_delta=access_token_expires
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Generate opaque refresh token
+    refresh_token = generate_refresh_token()
+
+    # Hash refresh token before storing in database
+    from ..db.storage import refresh_tokens_db
+
+    token_hash = hash_refresh_token(refresh_token)
+    refresh_tokens_db[token_hash] = {
+        "user_id": user_data["id"],
+        "expires_at": datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,  # ← Return plain text to client
+        "token_type": "bearer",
+    }
+
+
+@router.post("/refresh-token", response_model=Token)
+async def refresh_access_token(request: RefreshTokenRequest):
+    """refresh token.
+
+    Flow:
+    1. Client sends plain text refresh token
+    2. Server hashes it and looks up in database
+    3. If valid and not expired → generate new tokens
+
+    - **refresh_token**: Valid refresh token from login
+
+    Returns:
+        - **access_token**: New JWT access token
+        - **refresh_token**: New opaque refresh token (plain text)
+        - **token_type**: Always "bearer"
+
+    Raises:
+        401 Unauthorized: If refresh token is invalid or expired
+    """
+    from ..db.storage import refresh_tokens_db, users_db
+
+    # Hash the refresh token client sent
+    token_hash = hash_refresh_token(request.refresh_token)
+
+    # Look up hashed token in database
+    token_data = refresh_tokens_db.get(token_hash)
+
+    if not token_data:
+        raise UnauthorizedException("Invalid or expired refresh token")
+
+    # Check if token has expired
+    if datetime.now(timezone.utc) > token_data["expires_at"]:
+        # Clean up expired token
+        del refresh_tokens_db[token_hash]
+        raise UnauthorizedException("Refresh token has expired")
+
+    # Get user data
+    user_id = token_data["user_id"]
+    user_data = users_db.get(user_id)
+
+    if not user_data:
+        raise UnauthorizedException("User not found")
+
+    # Generate new access token
+    access_token_expires = timedelta(minutes=30)
+    new_access_token = create_access_token(
+        data={"sub": user_data["email"]}, expires_delta=access_token_expires
+    )
+
+    # Generate new opaque refresh token
+    new_refresh_token = generate_refresh_token()
+
+    # Hash and save new token, revoke old one
+    new_token_hash = hash_refresh_token(new_refresh_token)
+
+    refresh_tokens_db[new_token_hash] = {
+        "user_id": user_id,
+        "expires_at": datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    # Revoke old refresh token (delete from database)
+    del refresh_tokens_db[token_hash]
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.get("/me", response_model=UserResponse)
