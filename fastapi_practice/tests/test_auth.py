@@ -339,3 +339,99 @@ class TestUpdateProfile:
         assert response.status_code == 403
         data = response.json()
         assert "error" in data
+
+
+class TestAuthenticationFlow:
+    """Test complete authentication workflow."""
+
+    def test_full_auth_flow(self, client):
+        """Test complete flow: register -> login -> access protected route."""
+        # Step 1: Register
+        new_user_email = "flowtest@example.com"
+        new_user_password = "flowtestpass123"
+
+        register_response = client.post(
+            "/users/register",
+            json={
+                "email": new_user_email,
+                "password": new_user_password,
+            },
+        )
+        assert register_response.status_code == 201
+        registered_user = register_response.json()
+        assert registered_user["email"] == new_user_email
+
+        # Step 2: Login
+        login_response = client.post(
+            "/users/login",
+            data={
+                "username": new_user_email,
+                "password": new_user_password,
+            },
+        )
+        assert login_response.status_code == 200
+        tokens = login_response.json()
+        access_token = tokens["access_token"]
+        assert len(access_token) > 0
+
+        # Step 3: Access protected route with token
+        protected_response = client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert protected_response.status_code == 200
+        user_profile = protected_response.json()
+        assert user_profile["email"] == new_user_email
+        assert user_profile["id"] == registered_user["id"]
+
+    def test_auth_flow_with_password_change(self, client):
+        """Test full flow including password change and re-login."""
+        # Register
+        original_email = "passchange@example.com"
+        original_password = "originalpass123"
+
+        register_response = client.post(
+            "/users/register",
+            json={"email": original_email, "password": original_password},
+        )
+        assert register_response.status_code == 201
+
+        # Login with original password
+        login_response = client.post(
+            "/users/login",
+            data={"username": original_email, "password": original_password},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+
+        # Change password
+        new_password = "newpass123"
+        update_response = client.put(
+            "/users/me",
+            json={"password": new_password},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert update_response.status_code == 200
+
+        # Try login with original password (should fail)
+        failed_login = client.post(
+            "/users/login",
+            data={"username": original_email, "password": original_password},
+        )
+        assert failed_login.status_code == 401
+
+        # Login with new password (should succeed)
+        new_login = client.post(
+            "/users/login",
+            data={"username": original_email, "password": new_password},
+        )
+        assert new_login.status_code == 200
+        new_token = new_login.json()["access_token"]
+
+        # Access protected route with new token
+        profile_response = client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {new_token}"},
+        )
+        assert profile_response.status_code == 200
+        assert profile_response.json()["email"] == original_email

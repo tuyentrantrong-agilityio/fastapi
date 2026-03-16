@@ -180,3 +180,58 @@ def admin_auth_headers(admin_token):
         dict: HTTP headers with admin Authorization
     """
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture
+def test_user_2(test_user_data):
+    """
+    Create a second test user in the database for authorization testing.
+
+    Returns:
+        dict: Created user data with id, email, hashed_password, role
+    """
+    user_id = user_id_counter["id"]
+    user_id_counter["id"] += 1
+
+    users_db[user_id] = {
+        "id": user_id,
+        "email": "testuser2@example.com",
+        "hashed_password": hash_password("pass5678"),
+        "is_active": True,
+        "role": "user",
+    }
+
+    return users_db[user_id]
+
+
+@pytest.fixture
+def user_token_2(test_user_2):
+    """
+    Generate a valid JWT token for second test user.
+
+    Args:
+        test_user_2: Second test user fixture
+
+    Returns:
+        str: Valid JWT token for user 2
+    """
+    access_token_expires = timedelta(minutes=30)
+    token = create_access_token(
+        data={"sub": test_user_2["email"]},
+        expires_delta=access_token_expires,
+    )
+    return token
+
+
+@pytest.fixture
+def auth_headers_user_2(user_token_2):
+    """
+    Provide Authorization header with Bearer token for second user.
+
+    Args:
+        user_token_2: JWT token fixture for user 2
+
+    Returns:
+        dict: HTTP headers with Authorization for user 2
+    """
+    return {"Authorization": f"Bearer {user_token_2}"}
