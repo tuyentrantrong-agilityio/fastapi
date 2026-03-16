@@ -167,17 +167,17 @@ Authorization: Bearer <your-access-token>
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| POST | /users/register | Register new user | ❌ |
-| POST | /users/login | Login & get token | ❌ |
-| GET | /users/me | Get current profile | ✅ |
-| PUT | /users/me | Update profile | ✅ |
-| POST | /tasks | Create task | ✅ |
-| GET | /tasks | List my tasks | ✅ |
-| GET | /tasks/{id} | Get task details | ✅ |
-| PUT | /tasks/{id} | Update task | ✅ |
-| DELETE | /tasks/{id} | Delete task | ✅ |
-| POST | /projects | Create project | ✅ |
-| GET | /projects | List my projects | ✅ |
+| POST | /users/register | Register new user | No |
+| POST | /users/login | Login & get token | No |
+| GET | /users/me | Get current profile | Yes |
+| PUT | /users/me | Update profile | Yes |
+| POST | /tasks | Create task | Yes |
+| GET | /tasks | List my tasks | Yes |
+| GET | /tasks/{id} | Get task details | Yes |
+| PUT | /tasks/{id} | Update task | Yes |
+| DELETE | /tasks/{id} | Delete task | Yes |
+| POST | /projects | Create project | Yes |
+| GET | /projects | List my projects | Yes |
 
 **Query Parameters for Task List:**
 - `?status=todo` - Filter by status (todo, in_progress, done)

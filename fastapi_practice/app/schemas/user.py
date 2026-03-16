@@ -5,7 +5,7 @@ from typing import Optional
 class UserCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {"email": "user@example.com", "password": "secure_password123"}
+            "example": {"email": "tuyen@example.com", "password": "secure_password123"}
         }
     )
 
@@ -19,7 +19,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
-            "example": {"id": 1, "email": "user@example.com", "role": "user"}
+            "example": {"id": 1, "email": "tuyen@example.com", "role": "user"}
         },
     )
 

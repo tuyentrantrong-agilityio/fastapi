@@ -4,7 +4,7 @@ from .core.handlers import register_exception_handlers
 from .routers import user, task, project
 
 app = FastAPI(
-    title="Practice 1 API",
+    title="FastAPI Practice API",
     description="FastAPI practice project with structure",
     version="1.0.0",
     debug=settings.DEBUG,

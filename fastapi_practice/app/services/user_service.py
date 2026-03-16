@@ -76,7 +76,10 @@ async def update_user_profile_service(
         ForbiddenException: If user tries to change role without admin access
     """
     # Update email if provided
-    if user_update.email is not None:
+    if (
+        user_update.email is not None
+        and user_update.email != users_db[user_id]["email"]
+    ):
         # Check if email already exists
         for uid, user_data in users_db.items():
             if uid != user_id and user_data["email"] == user_update.email:

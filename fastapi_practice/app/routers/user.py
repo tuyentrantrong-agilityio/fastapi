@@ -31,7 +31,39 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post(
-    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {
+            "description": "Bad Request - Email already exists",
+            "content": {
+                "application/json": {"example": {"detail": "Email already registered"}}
+            },
+        },
+        422: {
+            "description": "Validation Error - Invalid input data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "password"],
+                                "msg": "ensure this value has at least 8 characters",
+                                "type": "value_error",
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error",
+            "content": {
+                "application/json": {"example": {"detail": "Internal server error"}}
+            },
+        },
+    },
 )
 async def register(user: UserCreate):
     """
@@ -48,7 +80,7 @@ async def register(user: UserCreate):
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
-    Login endpoint to authenticate user and get JWT access token and opaque refresh token.
+    Login endpoint to authenticate user and get JWT access token and opaque refresh token
 
     - **username**: Email address (OAuth2PasswordRequestForm uses 'username' field)
     - **password**: User password
