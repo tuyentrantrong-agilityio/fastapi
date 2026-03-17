@@ -35,68 +35,53 @@ Before you begin, ensure you have the following installed:
 
 ### Quick Start
 
-#### 1. Clone Repository and Navigate
-
+#### 1. Clone repo
 ```bash
 git clone git@gitlab.asoft-python.com:tuyen.trantrong/python.git
+```
+
+#### 2. Navigate to directory
+```bash
 cd python
 git checkout feat/fastapi-practice
 cd fastapi_practice
 ```
 
-#### 2. Setup (Choose One Option)
-
-**Option A: Automated Setup (Windows)**
-
-Run the setup script to automatically create venv and install dependencies:
-
+#### 3. Create virtual environment
 ```bash
-.\setup.bat 
+python -m venv .venv
 ```
 
-This will:
-- Create `.venv` virtual environment
-- Activate venv
-- Install dependencies from `pyproject.toml`
-- Setup `.env` file from `.env.example`
+#### 4. Activate venv
 
-**Option B: Manual Setup (Windows/macOS/Linux)**
-
-Create Virtual Environment:
-
+**PowerShell (Windows):**
 ```bash
-# Windows
-python -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
+```
 
-# macOS/Linux
-python3 -m venv .venv
+**cmd (Windows):**
+```bash
+.venv\Scripts\activate.bat
+```
+
+**macOS/Linux:**
+```bash
 source .venv/bin/activate
 ```
 
-Install Dependencies:
-
+#### 5. Install dependencies
 ```bash
-pip install -e ".[dev]"
+python -m pip install -r requirements.txt
 ```
 
-Setup Environment File:
-
+#### 6. Copy file config
 ```bash
 cp .env.example .env
 ```
 
-#### 3. Run Application
-
+#### 7. Run uvicorn
 ```bash
-# Option 1: Using uvicorn directly
 uvicorn app.main:app --reload
-
-# Option 2: Using run script (macOS/Linux)
-./run.sh
-
-# Option 3: Windows batch file
-run.bat
 ```
 
 #### 4. Access Application
