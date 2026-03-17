@@ -435,3 +435,157 @@ class TestAuthenticationFlow:
         )
         assert profile_response.status_code == 200
         assert profile_response.json()["email"] == original_email
+
+
+class TestRefreshToken:
+    """Test refresh token endpoint."""
+
+    def test_refresh_token_success(self, client, test_user, test_user_data):
+        """
+        Test successful token refresh.
+
+        Should return 200 OK with new access token.
+        """
+        # Get tokens from login
+        login_response = client.post(
+            "/users/login",
+            data={
+                "username": test_user_data["email"],
+                "password": test_user_data["password"],
+            },
+        )
+        assert login_response.status_code == 200
+        tokens = login_response.json()
+        refresh_token = tokens.get("refresh_token")
+
+        # Should have refresh token in response
+        assert refresh_token is not None
+        assert len(refresh_token) > 0
+
+        # Use refresh token to get new access token
+        refresh_response = client.post(
+            "/users/refresh-token",
+            json={"refresh_token": refresh_token},
+        )
+
+        assert refresh_response.status_code == 200
+        new_tokens = refresh_response.json()
+        assert "access_token" in new_tokens
+        assert len(new_tokens["access_token"]) > 0
+
+    def test_refresh_token_invalid(self, client):
+        """
+        Test refresh with invalid token.
+
+        Should return 401 Unauthorized.
+        """
+        response = client.post(
+            "/users/refresh-token",
+            json={"refresh_token": "invalid.refresh.token"},
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "error" in data
+
+    def test_refresh_token_missing(self, client):
+        """
+        Test refresh without providing refresh token.
+
+        Should return 422 Unprocessable Entity.
+        """
+        response = client.post(
+            "/users/refresh-token",
+            json={},
+        )
+
+        assert response.status_code == 422
+
+    def test_refresh_token_enables_new_requests(
+        self, client, test_user, test_user_data
+    ):
+        """
+        Test that refreshed token can be used to access protected endpoints.
+        """
+        # Login
+        login_response = client.post(
+            "/users/login",
+            data={
+                "username": test_user_data["email"],
+                "password": test_user_data["password"],
+            },
+        )
+        tokens = login_response.json()
+        refresh_token = tokens.get("refresh_token")
+
+        # Refresh token
+        refresh_response = client.post(
+            "/users/refresh-token",
+            json={"refresh_token": refresh_token},
+        )
+        assert refresh_response.status_code == 200
+        new_access_token = refresh_response.json()["access_token"]
+
+        # Use new access token to access protected endpoint
+        protected_response = client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {new_access_token}"},
+        )
+
+        assert protected_response.status_code == 200
+        data = protected_response.json()
+        assert data["email"] == test_user_data["email"]
+
+    def test_refresh_token_different_from_access_token(
+        self, client, test_user, test_user_data
+    ):
+        """
+        Test that refresh token is different from access token.
+        """
+        login_response = client.post(
+            "/users/login",
+            data={
+                "username": test_user_data["email"],
+                "password": test_user_data["password"],
+            },
+        )
+        tokens = login_response.json()
+        access_token = tokens["access_token"]
+        refresh_token = tokens.get("refresh_token")
+
+        # Should be different tokens
+        assert access_token != refresh_token
+        # Refresh token should be longer (64 char hex from secrets.token_hex)
+        assert len(refresh_token) > len(access_token.split(".")[0])
+
+    def test_refresh_token_returns_new_access_token(
+        self, client, test_user, test_user_data
+    ):
+        """
+        Test that refresh returns a valid new access token.
+        """
+        # Login
+        login_response = client.post(
+            "/users/login",
+            data={
+                "username": test_user_data["email"],
+                "password": test_user_data["password"],
+            },
+        )
+        refresh_token = login_response.json().get("refresh_token")
+
+        # Refresh
+        refresh = client.post(
+            "/users/refresh-token",
+            json={"refresh_token": refresh_token},
+        )
+        assert refresh.status_code == 200
+        token = refresh.json()["access_token"]
+
+        # Use refreshed token to access protected endpoint
+        profile_response = client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert profile_response.status_code == 200
+        assert profile_response.json()["email"] == test_user_data["email"]

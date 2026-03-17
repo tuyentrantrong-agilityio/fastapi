@@ -1,17 +1,17 @@
 # FastAPI Task Management Application
 
-A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 90 comprehensive unit tests.
+A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 129 comprehensive tests (47 unit tests + 82 integration tests).
 
 ## Overview
 
 This project builds a production-like task management API with:
-- User authentication and authorization with JWT tokens
+- User authentication and authorization with JWT tokens and refresh token rotation
 - Secure password hashing using Argon2id (OWASP recommended)
 - Full CRUD operations for tasks with filtering, search, and pagination
 - Role-based access control (user vs admin)
 - Task ownership enforcement (users can only access their own tasks)
 - Project management with task assignments
-- 90 unit tests covering all major functionality
+- **129 comprehensive tests** (47 unit tests + 82 integration tests)
 - Modular architecture with clear separation of concerns
 
 ## Tech Stack
@@ -133,22 +133,30 @@ fastapi_practice/
 │   │
 │   ├── services/                # Business logic layer
 │   │   ├── __init__.py
-│   │   ├── user_service.py     # User business logic
-│   │   ├── task_service.py     # Task business logic
-│   │   └── project_service.py  # Project business logic
+│   │   ├── auth_service.py     # Authentication logic (login, refresh token)
+│   │   ├── user_service.py     # User business logic (register, profile)
+│   │   ├── task_service.py     # Task business logic (CRUD, filtering)
+│   │   └── project_service.py  # Project business logic (CRUD, task assignment)
 │   │
 │   └── dependencies/            # FastAPI dependency injection
 │       ├── __init__.py
 │       ├── user.py             # get_current_user, get_admin_user
 │       └── task.py             # get_task_or_404
 │
-├── tests/                       # Test suite
+├── tests/                       # Test suite (129 tests total)
 │   ├── __init__.py
 │   ├── conftest.py             # Pytest fixtures and configuration
-│   ├── test_auth.py            # User authentication tests (18 tests)
-│   ├── test_tasks.py           # Task CRUD tests (39 tests)
-│   ├── test_projects.py        # Project management tests (19 tests)
-│   └── test_auth_errors.py     # Authorization and error handling tests (14 tests)
+│   │
+│   ├── unit/                   # Unit tests (47 tests - Business logic isolation)
+│   │   ├── __init__.py
+│   │   ├── test_auth_service.py         # Login & refresh token logic (9 tests)
+│   │   ├── test_user_service.py        # User CRUD operations (13 tests)
+│   │   ├── test_task_service.py        # Task business logic (13 tests)
+│   │   └── test_project_service.py     # Project logic (12 tests)
+│   │
+│   ├── test_auth.py            # Integration: User authentication (26 tests)
+│   ├── test_tasks.py           # Integration: Task CRUD via HTTP (36 tests)
+│   └── test_projects.py        # Integration: Project management (20 tests)
 │
 ├── requirements.txt             # Python dependencies
 ├── .env.example                # Example environment variables
@@ -210,25 +218,58 @@ Headers: Authorization: Bearer <access-token>
 
 ## Running Tests
 
+### Test Structure
+
+This project uses **two types of tests**:
+
+1. **Unit Tests (47 tests)** - Test business logic in isolation with mocked dependencies
+   - Location: `tests/unit/`
+   - Files: `test_auth_service.py`, `test_user_service.py`, `test_task_service.py`, `test_project_service.py`
+   - Use: pytest with unittest.mock (patch, MagicMock)
+   - Focus: Login/Refresh token logic, User/Task/Project CRUD operations
+
+2. **Integration Tests (82 tests)** - Test HTTP endpoints with real database state
+   - Location: `tests/test_auth.py`, `tests/test_tasks.py`, `tests/test_projects.py`
+   - Use: FastAPI TestClient (httpx)
+   - Focus: HTTP status codes, response formats, end-to-end workflows
+
+### Running Tests
+
 ```bash
-# Run all tests
+# Run all tests (129 total)
 pytest tests/ -v
 
+# Run only unit tests (47 tests)
+pytest tests/unit/ -v
+
+# Run only integration tests (82 tests)
+pytest tests/ --ignore=tests/unit -v
+
 # Run specific test file
-pytest tests/test_auth.py -v
+pytest tests/unit/test_auth_service.py -v
+
+# Run specific test class
+pytest tests/unit/test_auth_service.py::TestLoginService -v
 
 # Run specific test
-pytest tests/test_auth.py::TestRegister::test_register_success -v
+pytest tests/unit/test_auth_service.py::TestLoginService::test_login_success -v
+
+# Quick check (quiet mode)
+pytest tests/unit/ -q
 
 # Generate coverage report
 pytest tests/ --cov=app --cov-report=html
 ```
 
-**Test Coverage** (90 tests):
-- Authentication: 18 tests (Register, Login, Profile, Token Management)
-- Task CRUD: 39 tests (Create, Read, Update, Delete, Filtering, Pagination, Isolation)
-- Project Management: 19 tests (Create, List, Task Assignment, Authorization)
-- Authorization & Errors: 14 tests (Ownership, Permissions, Error Handling, Edge Cases)
+### Test Coverage
+
+| Component | Unit Tests | Integration Tests | Total |
+|-----------|-----------|------------------|-------|
+| **Authentication** | 9 (Login, Refresh token) | 26 (Register, Login, Profile) | 35 |
+| **User Service** | 13 (CRUD, profiles) | — | 13 |
+| **Task Service** | 13 (CRUD, filtering) | 36 (API endpoints) | 49 |
+| **Project Service** | 12 (CRUD, assignment) | 20 (API endpoints) | 32 |
+| **TOTAL** | **47** | **82** | **129** |
 
 ## Environment Variables
 
