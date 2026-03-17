@@ -38,46 +38,55 @@ Before you begin, ensure you have the following installed:
 #### 1. Clone Repository and Navigate
 
 ```bash
-git clone <repository-url>
+git clone git@gitlab.asoft-python.com:tuyen.trantrong/python.git
+cd python
+git checkout feat/fastapi-practice
 cd fastapi_practice
 ```
 
-#### 2. Create Virtual Environment
+#### 2. Setup (Choose One Option)
+
+**Option A: Automated Setup (Windows)**
+
+Run the setup script to automatically create venv and install dependencies:
+
+```bash
+.\setup.bat 
+```
+
+This will:
+- Create `.venv` virtual environment
+- Activate venv
+- Install dependencies from `pyproject.toml`
+- Setup `.env` file from `.env.example`
+
+**Option B: Manual Setup (Windows/macOS/Linux)**
+
+Create Virtual Environment:
 
 ```bash
 # Windows
-python -m venv venv
-venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate
 
 # macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-#### 3. Install Dependencies
+Install Dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-#### 4. Create Environment File
-
-Copy the example environment file and configure it:
+Setup Environment File:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` file (optional - defaults are set in config.py):
-
-```env
-SECRET_KEY=your-secret-key-change-in-production
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-ALGORITHM=HS256
-DEBUG=True
-```
-
-#### 5. Run Application
+#### 3. Run Application
 
 ```bash
 # Option 1: Using uvicorn directly
@@ -90,7 +99,7 @@ uvicorn app.main:app --reload
 run.bat
 ```
 
-#### 6. Access Application
+#### 4. Access Application
 
 - API Documentation (Swagger UI): http://localhost:8000/docs
 - Alternative Docs (ReDoc): http://localhost:8000/redoc
