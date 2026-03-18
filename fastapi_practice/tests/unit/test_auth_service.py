@@ -25,6 +25,10 @@ class TestLoginService:
                 "app.services.auth_service.get_user_by_email_service",
                 new_callable=AsyncMock,
             ) as mock_get_user,
+            #             patch(
+            #     "app.services.auth_service.get_user_by_email_service",
+            #     new=AsyncMock(return_value=mock_user_data)  # ← AsyncMock + return_value
+            # )
             patch("app.services.auth_service.verify_password", return_value=True),
             patch(
                 "app.services.auth_service.create_access_token",
