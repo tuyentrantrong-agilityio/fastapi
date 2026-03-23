@@ -395,7 +395,88 @@ def advanced_queries(session):
     # With relationship (eager loading)
     user_with_tasks = session.get(User, 1)
     if user_with_tasks:
-        print(user_with_tasks.tasks)  # Access relationship
+        print(user_with_tasks.tasks)
+
+
+# ==================== 11. RELATIONSHIPS & JOINS ====================
+
+from sqlalchemy.orm import selectinload
+
+
+def relationship_examples(session):
+    """Work with relationships and joins"""
+
+    print("\n========== RELATIONSHIP EXAMPLES ==========\n")
+
+    # Lazy loading (default - multiple queries)
+    user = session.get(User, 1)
+    if user:
+        print(f"User: {user.username}")
+        print(f"Tasks: {user.tasks}")  # Triggers separate query
+
+    # Eager loading (one query - recommended)
+    statement = select(User).where(User.id == 1).options(selectinload(User.tasks))
+    user_with_tasks = session.exec(statement).first()
+    if user_with_tasks:
+        print(f"User: {user_with_tasks.username}")
+        print(f"Tasks: {user_with_tasks.tasks}")
+
+    # Access relationship data
+    user = session.get(User, 1)
+    if user:
+        for task in user.tasks:
+            print(f"Task: {task.title} ({task.status})")
+            print(f"Owner: {task.owner.username}")
+
+    # Filter through relationships
+    statement = select(User).where(User.tasks.any(Task.status == "done"))
+    users_with_done = session.exec(statement).all()
+    print(f"Users with done tasks: {len(users_with_done)}")
+
+    # Reverse relationship (back_populates)
+    task = session.get(Task, 1)
+    if task:
+        print(f"Task: {task.title}")
+        print(f"Owner: {task.owner.username}")
+        print("Other tasks by this owner:")
+        for t in task.owner.tasks:
+            print(f"  - {t.title}")
+
+
+def join_examples(session):
+    """SQL join examples"""
+
+    print("\n========== JOIN EXAMPLES ==========\n")
+
+    # Inner join - only matching records
+    statement = select(Task).join(User).where(User.is_active == True)
+    tasks = session.exec(statement).all()
+    print(f"Tasks by active users: {len(tasks)}")
+
+    # Left outer join
+    statement = select(Task, User).join(User, Task.user_id == User.id, isouter=True)
+    tasks_with_users = session.exec(statement).all()
+    print(f"All tasks (including orphaned): {len(tasks_with_users)}")
+
+    # Filter across join
+    statement = select(Task).join(User).where(User.email.ilike("%example%"))
+    filtered = session.exec(statement).all()
+    print(f"Tasks by example.com users: {len(filtered)}")
+
+    # Aggregation with join
+    statement = (
+        select(
+            User.username,
+            func.count(Task.id).label("total_tasks"),
+            func.count(Task.id).filter(Task.status == "done").label("done_tasks"),
+        )
+        .join(Task, User.id == Task.user_id, isouter=True)
+        .group_by(User.id)
+    )
+
+    results = session.exec(statement).all()
+    for username, total, done in results:
+        print(f"{username}: {total} total, {done} done")
 
 
 if __name__ == "__main__":
