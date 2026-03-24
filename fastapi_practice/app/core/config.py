@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
     DEBUG: bool = False
+    DATABASE_URL: str = "sqlite:///./app.db"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
