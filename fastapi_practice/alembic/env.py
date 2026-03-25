@@ -6,7 +6,8 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import SQLModel models for auto-migration detection
-from sqlalchemy_example import SQLModel
+from app.db.base import SQLModel
+from app.models import User, Task, Project  # ← Import models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -29,6 +30,19 @@ target_metadata = SQLModel.metadata
 # ... etc.
 
 
+def process_revision_directives(context, revision, directives):
+    """Auto-import sqlmodel in generated migration files (Alembic hook).
+
+    Alembic calls this function before writing migration files.
+    We use it to ensure sqlmodel is imported when needed.
+    """
+    for directive in directives:
+        if directive.imports is None:
+            directive.imports = set()
+        # Add sqlmodel import to prevent NameError
+        directive.imports.add("import sqlmodel")
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -47,6 +61,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        process_revision_directives=process_revision_directives,
     )
 
     with context.begin_transaction():
@@ -67,7 +82,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=process_revision_directives,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
