@@ -4,11 +4,15 @@ from datetime import datetime, timezone
 from typing import List
 
 from ..core.exceptions import NotFoundException, ForbiddenException
-from ..db.storage import projects_db, project_id_counter, tasks_db
+from sqlmodel import Session, select
+from ..models.project import Project
+from ..models.task import Task
 from ..schemas.project import ProjectCreate
 
 
-async def create_project_service(project: ProjectCreate, user_id: int) -> dict:
+async def create_project_service(
+    session: Session, project: ProjectCreate, user_id: int
+) -> Project:
     """
     Create a new project for user.
 
@@ -17,26 +21,19 @@ async def create_project_service(project: ProjectCreate, user_id: int) -> dict:
         user_id: ID of the user creating the project
 
     Returns:
-        Created project dictionary
+        Created project object
     """
-    project_id = project_id_counter["id"]
-    project_id_counter["id"] += 1
+    new_project = Project(**project.__dict__)
+    # Set user_id from parameter (not included in ProjectCreate schema)
+    new_project.user_id = user_id
+    session.add(new_project)
+    session.commit()
+    session.refresh(new_project)
 
-    now = datetime.now(timezone.utc)
-
-    projects_db[project_id] = {
-        "id": project_id,
-        "user_id": user_id,
-        "name": project.name,
-        "description": project.description,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-    return projects_db[project_id]
+    return new_project
 
 
-async def get_user_projects_service(user_id: int) -> List[dict]:
+async def get_user_projects_service(session: Session, user_id: int) -> List[Project]:
     """
     Get all projects for a user.
 
@@ -44,17 +41,18 @@ async def get_user_projects_service(user_id: int) -> List[dict]:
         user_id: ID of the user
 
     Returns:
-        List of project dictionaries
+        List of project objects
     """
-    user_projects = [
-        project for project in projects_db.values() if project["user_id"] == user_id
-    ]
-    return user_projects
+    # Query database for all projects owned by user
+    statement = select(Project).where(Project.user_id == user_id)
+    user_projects = session.exec(statement).all()
+    # Convert Sequence to List for consistency
+    return list(user_projects)
 
 
 async def assign_task_to_project_service(
-    project_id: int, task_id: int, user_id: int
-) -> dict:
+    session: Session, project_id: int, task_id: int, user_id: int
+) -> Task:
     """
     Assign a task to a project.
 
@@ -64,28 +62,33 @@ async def assign_task_to_project_service(
         user_id: ID of the user (must own both project and task)
 
     Returns:
-        Updated task dictionary
+        Updated task object
 
     Raises:
         NotFoundException: If project or task not found
         ForbiddenException: If user doesn't own the project or task
     """
-    # Verify project exists and user owns it
-    project = projects_db.get(project_id)
+    # Verify project exists and user has permission
+    statement = select(Project).where(Project.id == project_id)
+    project = session.exec(statement).first()
     if not project:
         raise NotFoundException("Project", project_id)
-    if project["user_id"] != user_id:
+    if project.user_id != user_id:
         raise ForbiddenException("You don't have permission to access this project")
 
-    # Verify task exists and user owns it
-    task = tasks_db.get(task_id)
+    # Verify task exists and user has permission
+    statement = select(Task).where(Task.id == task_id)
+    task = session.exec(statement).first()
     if not task:
         raise NotFoundException("Task", task_id)
-    if task["user_id"] != user_id:
+    if task.user_id != user_id:
         raise ForbiddenException("You don't have permission to access this task")
 
-    # Assign task to project
-    task["project_id"] = project_id
-    task["updated_at"] = datetime.now(timezone.utc)
+    # Assign task to project with updated timestamp
+    task.project_id = project_id
+    task.updated_at = datetime.now(timezone.utc)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
 
     return task

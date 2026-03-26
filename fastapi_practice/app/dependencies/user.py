@@ -3,10 +3,15 @@ from fastapi import Depends
 from ..core.security import oauth2_scheme, decode_token
 from ..core.exceptions import UnauthorizedException, ForbiddenException
 from ..schemas.user import UserInDB
-from ..db.storage import users_db
+
+from sqlmodel import Session, select
+from ..models.user import User
+from app.db.session import get_session
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
+async def get_current_user(
+    session: Session = Depends(get_session), token: str = Depends(oauth2_scheme)
+) -> UserInDB:
     """
     Dependency to get current authenticated user from JWT token.
 
@@ -32,15 +37,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
 
     # Find user by email in database
     user_data = None
-    for user in users_db.values():
-        if user["email"] == email:
-            user_data = user
-            break
+    statement = select(User).where(User.email == email)
+    user_data = session.exec(statement).first()
 
     if user_data is None:
         raise UnauthorizedException("Invalid or expired credentials")
 
-    return UserInDB(**user_data)
+    # Convert SQLModel object to Pydantic schema using from_attributes=True
+    # This automatically maps User.id, User.email, User.role, User.hashed_password
+    return UserInDB.model_validate(user_data)
 
 
 async def get_admin_user(

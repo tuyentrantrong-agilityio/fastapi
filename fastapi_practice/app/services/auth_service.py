@@ -1,7 +1,9 @@
 """Auth service - handles authentication business logic."""
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict
+from typing import Dict, cast
+
+from sqlmodel import Session, select
 
 from ..core.hashing import verify_password
 from ..core.security import (
@@ -11,11 +13,14 @@ from ..core.security import (
 )
 from ..core.exceptions import UnauthorizedException
 from ..core.config import settings
-from ..db.storage import users_db, refresh_tokens_db
+from ..models.refresh_token import RefreshToken
+from ..models.user import User
+
+# from ..db.storage import users_db, refresh_tokens_db
 from .user_service import get_user_by_email_service
 
 
-async def login_service(email: str, password: str) -> Dict[str, str]:
+async def login_service(session: Session, email: str, password: str) -> Dict[str, str]:
     """
     Authenticate user and generate tokens.
 
@@ -30,16 +35,16 @@ async def login_service(email: str, password: str) -> Dict[str, str]:
         UnauthorizedException: If email not found or password is invalid
     """
     # Find user by email
-    user_data = await get_user_by_email_service(email)
+    user_data = await get_user_by_email_service(session, email)
 
-    # Validate credentials
-    if not user_data or not verify_password(password, user_data["hashed_password"]):
+    # Validate credentials (email exists and password matches)
+    if not user_data or not verify_password(password, user_data.hashed_password):
         raise UnauthorizedException("Invalid email or password")
 
     # Generate JWT access token
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"sub": user_data["email"]}, expires_delta=access_token_expires
+        data={"sub": user_data.email}, expires_delta=access_token_expires
     )
 
     # Generate opaque refresh token
@@ -47,12 +52,19 @@ async def login_service(email: str, password: str) -> Dict[str, str]:
 
     # Hash and store refresh token in database
     token_hash = hash_refresh_token(refresh_token)
-    refresh_tokens_db[token_hash] = {
-        "user_id": user_data["id"],
-        "expires_at": datetime.now(timezone.utc)
+    if user_data.id is None:
+        raise ValueError("User ID missing")
+    refresh_tokens = RefreshToken(
+        user_id=user_data.id,
+        # user cast to int, dont check condition user_data.id is None
+        # user_id=cast(int, user_data.id),
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc)
         + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        "created_at": datetime.now(timezone.utc),
-    }
+    )
+    session.add(refresh_tokens)
+    session.commit()
+    session.refresh(refresh_tokens)
 
     return {
         "access_token": access_token,
@@ -61,7 +73,9 @@ async def login_service(email: str, password: str) -> Dict[str, str]:
     }
 
 
-async def refresh_access_token_service(refresh_token: str) -> Dict[str, str]:
+async def refresh_access_token_service(
+    session: Session, refresh_token: str
+) -> Dict[str, str]:
     """
     Refresh access token using refresh token.
 
@@ -81,24 +95,28 @@ async def refresh_access_token_service(refresh_token: str) -> Dict[str, str]:
     Raises:
         UnauthorizedException: If refresh token is invalid or expired
     """
-    # Hash the refresh token client sent
+    # Hash the refresh token client sent and look up in database
     token_hash = hash_refresh_token(refresh_token)
-
-    # Look up hashed token in database
-    token_data = refresh_tokens_db.get(token_hash)
+    statement = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    token_data = session.exec(statement).first()
 
     if not token_data:
         raise UnauthorizedException("Invalid or expired refresh token")
 
     # Check if token has expired
-    if datetime.now(timezone.utc) > token_data["expires_at"]:
-        # Clean up expired token
-        del refresh_tokens_db[token_hash]
+    if datetime.now(timezone.utc) > token_data.expires_at:
+        # Persist deleted token
+        session.delete(token_data)
+        session.commit()
+        # TODO: For audit trail, mark as revoked instead of delete:
+        # token_data.is_revoked = True
+        # session.add(token_data)
+        # session.commit()
         raise UnauthorizedException("Refresh token has expired")
 
-    # Get user data
-    user_id = token_data["user_id"]
-    user_data = users_db.get(user_id)
+    # Get user associated with token
+    user_id = token_data.user_id
+    user_data = token_data.user
 
     if not user_data:
         raise UnauthorizedException("User not found")
@@ -106,24 +124,25 @@ async def refresh_access_token_service(refresh_token: str) -> Dict[str, str]:
     # Generate new access token
     access_token_expires = timedelta(minutes=30)
     new_access_token = create_access_token(
-        data={"sub": user_data["email"]}, expires_delta=access_token_expires
+        data={"sub": user_data.email}, expires_delta=access_token_expires
     )
 
-    # Generate new opaque refresh token
+    # Generate new refresh token
     new_refresh_token = generate_refresh_token()
 
-    # Hash and save new token
+    # Hash and save new refresh token
     new_token_hash = hash_refresh_token(new_refresh_token)
-
-    refresh_tokens_db[new_token_hash] = {
-        "user_id": user_id,
-        "expires_at": datetime.now(timezone.utc)
+    new_refresh_token_record = RefreshToken(
+        user_id=user_id,
+        token_hash=new_token_hash,
+        expires_at=datetime.now(timezone.utc)
         + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        "created_at": datetime.now(timezone.utc),
-    }
+    )
 
-    # Revoke old refresh token (delete from database)
-    del refresh_tokens_db[token_hash]
+    # Revoke old refresh token and create new one in single transaction
+    session.delete(token_data)
+    session.add(new_refresh_token_record)
+    session.commit()
 
     return {
         "access_token": new_access_token,

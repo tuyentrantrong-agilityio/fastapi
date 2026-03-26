@@ -6,11 +6,13 @@ import math
 
 from ..schemas.task import TaskCreate, TaskUpdate
 from ..schemas.query import SortDirection
-from ..core.exceptions import BadRequestException
-from ..db.storage import tasks_db, task_id_counter
+from ..core.exceptions import BadRequestException, NotFoundException
+from sqlmodel import Session, select
+from sqlalchemy import or_, func
+from ..models.task import Task
 
 
-async def create_task_service(task: TaskCreate, user_id: int) -> dict:
+async def create_task_service(session: Session, task: TaskCreate, user_id: int) -> Task:
     """
     Create a new task for user.
 
@@ -19,27 +21,20 @@ async def create_task_service(task: TaskCreate, user_id: int) -> dict:
         user_id: ID of the user creating the task
 
     Returns:
-        Created task dictionary
+        Created task object
     """
-    task_id = task_id_counter["id"]
-    task_id_counter["id"] += 1
+    new_task = Task(**task.__dict__)
+    # Set user_id from parameter (not included in TaskCreate schema)
+    new_task.user_id = user_id
+    session.add(new_task)
+    session.commit()
+    session.refresh(new_task)
 
-    now = datetime.now(timezone.utc)
-
-    tasks_db[task_id] = {
-        "id": task_id,
-        "user_id": user_id,
-        "title": task.title,
-        "description": task.description,
-        "status": task.status.value if hasattr(task.status, "value") else task.status,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-    return tasks_db[task_id]
+    return new_task
 
 
 async def get_user_tasks_filtered_service(
+    session: Session,
     user_id: int,
     status_filter: Optional[str] = None,
     search: Optional[str] = None,
@@ -74,55 +69,65 @@ async def get_user_tasks_filtered_service(
     sort_by = sort_by or "created_at"
     sort_fields = search_fields or "title,description"
 
-    # Get all tasks for current user
-    user_tasks = [task for task in tasks_db.values() if task["user_id"] == user_id]
+    if page < 1 or limit < 1:
+        raise BadRequestException("page and limit must be greater than 0")
 
-    # Filter by status
-    if status_filter:
-        status_list = [s.strip() for s in status_filter.split(",")]
-        user_tasks = [task for task in user_tasks if task["status"] in status_list]
+    # Helper function to apply filters
+    def apply_filters(stmt):
+        """Apply status and search filters to statement"""
+        # Filter by status (comma-separated values)
+        if status_filter:
+            status_list = [s.strip() for s in status_filter.split(",") if s.strip()]
+            if status_list:
+                stmt = stmt.where(Task.status in status_list)
+                # stmt = stmt.where(Task.status.in_(status_list))
 
-    # Search
-    if search:
-        search_lower = search.lower()
-        search_field_list = [f.strip() for f in sort_fields.split(",")]
+        # Filter by search (case-insensitive LIKE on title/description)
+        if search:
+            search_field_list = [f.strip() for f in sort_fields.split(",") if f.strip()]
+            conditions = []
+            if "title" in search_field_list:
+                conditions.append(getattr(Task, "title").ilike(f"%{search}%"))
+            if "description" in search_field_list:
+                conditions.append(getattr(Task, "description").ilike(f"%{search}%"))
+            if conditions:
+                stmt = stmt.where(or_(*conditions))
 
-        filtered = []
-        for task in user_tasks:
-            match = False
-            if "title" in search_field_list and search_lower in task["title"].lower():
-                match = True
-            if (
-                "description" in search_field_list
-                and task.get("description")
-                and search_lower in task["description"].lower()
-            ):
-                match = True
-            if match:
-                filtered.append(task)
-        user_tasks = filtered
+        return stmt
 
-    # Sort
+    # Base query for current user
+    statement = select(Task).where(Task.user_id == user_id)
+
+    # Apply filters
+    statement = apply_filters(statement)
+
+    # Sort by field (asc/desc)
     sort_dir = (
         sort_direction.value
         if sort_direction and hasattr(sort_direction, "value")
         else sort_direction
     )
-    try:
-        user_tasks.sort(
-            key=lambda x: x.get(sort_by, ""),
-            reverse=(sort_dir == "desc"),
-        )
-    except (KeyError, TypeError):
-        user_tasks.sort(
-            key=lambda x: x.get("created_at", datetime.now(timezone.utc)),
-            reverse=(sort_dir == "desc"),
-        )
+    reverse = sort_dir == "desc"
+    # Whitelist valid fields to prevent injection
+    valid_fields = ["title", "description", "status", "created_at", "updated_at"]
+    if sort_by not in valid_fields:
+        sort_by = "created_at"
+    sort_column = getattr(Task, sort_by)
+    if reverse:
+        statement = statement.order_by(sort_column.desc())
+    else:
+        statement = statement.order_by(sort_column)
 
-    # Pagination
-    total = len(user_tasks)
+    # Pagination - count filtered results efficiently
+    count_stmt = (
+        select(func.count(Task.id)).select_from(Task).where(Task.user_id == user_id)
+    )
+    count_stmt = apply_filters(count_stmt)
+    total = session.exec(count_stmt).one()
+
     offset = (page - 1) * limit
-    items = user_tasks[offset : offset + limit]
+    statement = statement.offset(offset).limit(limit)
+    items = session.exec(statement).all()
     pages = math.ceil(total / limit) if total > 0 else 1
 
     return {
@@ -137,7 +142,9 @@ async def get_user_tasks_filtered_service(
     }
 
 
-async def update_task_service(task_id: int, task_update: TaskUpdate) -> dict:
+async def update_task_service(
+    session: Session, task_id: int, task_update: TaskUpdate
+) -> Task:
     """
     Update a task.
 
@@ -146,28 +153,38 @@ async def update_task_service(task_id: int, task_update: TaskUpdate) -> dict:
         task_update: TaskUpdate object with fields to update
 
     Returns:
-        Updated task dictionary
+        Updated task object
     """
-    task = tasks_db[task_id]
+    # Fetch task from database
+    statement = select(Task).where(Task.id == task_id)
+    task = session.exec(statement).first()
+    if not task:
+        raise NotFoundException("Task not found")
 
+    # Update task fields if provided
     if task_update.title is not None:
-        task["title"] = task_update.title
+        task.title = task_update.title
 
     if task_update.description is not None:
-        task["description"] = task_update.description
+        task.description = task_update.description
 
     if task_update.status is not None:
-        task["status"] = (
+        task.status = (
             task_update.status.value
             if hasattr(task_update.status, "value")
             else task_update.status
         )
+    # TODO: Need to improve project
 
-    task["updated_at"] = datetime.now(timezone.utc)
+    # Update timestamp and persist changes
+    task.updated_at = datetime.now(timezone.utc)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
     return task
 
 
-async def delete_task_service(task_id: int) -> dict:
+async def delete_task_service(session: Session, task_id: int) -> dict:
     """
     Delete a task.
 
@@ -175,7 +192,14 @@ async def delete_task_service(task_id: int) -> dict:
         task_id: ID of the task to delete
 
     Returns:
-        Deleted task dictionary
+        Dictionary with deleted task id and success message
     """
-    task = tasks_db.pop(task_id)
-    return task
+    statement = select(Task).where(Task.id == task_id)
+    task = session.exec(statement).first()
+    if not task:
+        raise NotFoundException("Task not found")
+
+    # Delete task from database
+    session.delete(task)
+    session.commit()
+    return {"id": task_id, "message": "Task deleted successfully"}
