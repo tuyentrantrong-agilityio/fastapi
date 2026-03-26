@@ -11,7 +11,7 @@ class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
     title: str
     description: Optional[str] = None
-    status: str = "todo"
+    status: str = Field(default="todo")  
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     user_id: int = Field(foreign_key="user.id")

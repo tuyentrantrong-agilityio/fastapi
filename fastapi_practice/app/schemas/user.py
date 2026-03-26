@@ -16,6 +16,8 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    # from_attributes=True allows Pydantic to accept ORM objects (SQLModel/SQLAlchemy)
+    # and automatically map their attributes to schema fields
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={

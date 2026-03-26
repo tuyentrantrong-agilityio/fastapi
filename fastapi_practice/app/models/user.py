@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 if TYPE_CHECKING:
     from app.models.task import Task
+    from app.models.refresh_token import RefreshToken
 
 
 class User(SQLModel, table=True):
@@ -13,5 +14,6 @@ class User(SQLModel, table=True):
     role: str = "user"
     is_active: bool = True
     tasks: list["Task"] = Relationship(back_populates="user")
+    refresh_tokens: list["RefreshToken"] = Relationship(back_populates="user")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
