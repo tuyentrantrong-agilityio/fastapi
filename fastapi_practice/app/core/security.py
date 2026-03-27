@@ -10,6 +10,19 @@ from .config import settings
 # OAuth2 scheme - tells FastAPI where to find the token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
+SUPPORTED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
+
+
+def get_jwt_algorithm() -> str:
+    alg = str(settings.ALGORITHM or "").strip().upper()
+    if alg not in SUPPORTED_JWT_ALGORITHMS:
+        # If config has invalid algorithm, fallback to secure default.
+        print(
+            f"[WARNING] Invalid JWT algorithm '{settings.ALGORITHM}' from config. Using 'HS256' instead."
+        )
+        return "HS256"
+    return alg
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
