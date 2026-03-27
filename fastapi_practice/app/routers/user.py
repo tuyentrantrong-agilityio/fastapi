@@ -1,5 +1,6 @@
 from fastapi import APIRouter, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.user import (
     UserCreate,
@@ -10,6 +11,7 @@ from ..schemas.user import (
     RefreshTokenRequest,
 )
 from ..dependencies.user import get_current_user, get_admin_user
+from ..db.session import get_async_session
 from ..services.user_service import (
     create_user_service,
     update_user_profile_service,
@@ -57,7 +59,9 @@ router = APIRouter(prefix="/users", tags=["users"])
         },
     },
 )
-async def register(user: UserCreate):
+async def register(
+    user: UserCreate, session: AsyncSession = Depends(get_async_session)
+):
     """
     Register a new user.
 
@@ -66,11 +70,14 @@ async def register(user: UserCreate):
 
     Returns: User ID and email
     """
-    return await create_user_service(user)
+    return await create_user_service(session, user)
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: AsyncSession = Depends(get_async_session),
+):
     """
     Login endpoint to authenticate user and get JWT access token and opaque refresh token
 
@@ -85,11 +92,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     Raises:
         401 Unauthorized: If email not found or password invalid
     """
-    return await login_service(form_data.username, form_data.password)
+    return await login_service(session, form_data.username, form_data.password)
 
 
 @router.post("/refresh-token", response_model=Token)
-async def refresh_access_token(request: RefreshTokenRequest):
+async def refresh_access_token(
+    request: RefreshTokenRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
     """
     Refresh access token using refresh token.
 
@@ -108,7 +118,7 @@ async def refresh_access_token(request: RefreshTokenRequest):
     Raises:
         401 Unauthorized: If refresh token is invalid or expired
     """
-    return await refresh_access_token_service(request.refresh_token)
+    return await refresh_access_token_service(session, request.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -127,7 +137,9 @@ async def get_profile(current_user: UserInDB = Depends(get_current_user)):
 
 @router.put("/me", response_model=UserResponse)
 async def update_profile(
-    user_update: UserUpdate, current_user: UserInDB = Depends(get_current_user)
+    user_update: UserUpdate,
+    current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Update current user's profile.
@@ -144,4 +156,6 @@ async def update_profile(
         Updated user profile
     """
     is_admin = current_user.role == "admin"
-    return await update_user_profile_service(current_user.id, user_update, is_admin)
+    return await update_user_profile_service(
+        session, current_user.id, user_update, is_admin
+    )

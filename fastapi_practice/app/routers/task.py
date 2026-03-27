@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, Depends, Query
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.task import TaskCreate, TaskUpdate, TaskResponse
 from ..schemas.user import UserInDB
@@ -8,6 +9,7 @@ from ..schemas.query import TaskFilterParams, SortDirection
 from ..core.exceptions import BadRequestException
 from ..dependencies.user import get_current_user
 from ..dependencies.task import get_task_or_404
+from ..db.session import get_async_session
 from ..services.task_service import (
     create_task_service,
     get_user_tasks_filtered_service,
@@ -20,7 +22,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 @router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
-    task: TaskCreate, current_user: UserInDB = Depends(get_current_user)
+    task: TaskCreate,
+    current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Create a new task for current user.
@@ -31,16 +35,18 @@ async def create_task(
     Args:
         task: TaskCreate object containing title, description (optional), and status (default: todo)
         current_user: Current authenticated user (auto-injected)
+        session: Database session (auto-injected)
 
     Returns:
         Created task with id, user_id, timestamps, etc.
     """
-    return await create_task_service(task, current_user.id)
+    return await create_task_service(session, task, current_user.id)
 
 
 @router.get("/", response_model=Dict[str, Any])
 async def get_all_tasks(
     current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
     status_filter: Optional[str] = Query(
         None,
         alias="status",
@@ -122,6 +128,7 @@ async def get_all_tasks(
         raise BadRequestException(str(e))
 
     return await get_user_tasks_filtered_service(
+        session=session,
         user_id=current_user.id,
         status_filter=filter_params.status,
         search=filter_params.search,
@@ -135,6 +142,7 @@ async def get_all_tasks(
 
 @router.get("/{task_id}", response_model=TaskResponse)
 async def get_task(
+    task_id: int,
     task: dict = Depends(get_task_or_404),
 ):
     """
@@ -162,6 +170,7 @@ async def update_task(
     task_id: int,
     task_update: TaskUpdate,
     task: dict = Depends(get_task_or_404),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Update task by ID.
@@ -173,6 +182,7 @@ async def update_task(
     Args:
         task_id: ID of the task to update (path parameter)
         task_update: TaskUpdate object with fields to update
+        session: Database session (auto-injected)
 
     Returns:
         Updated TaskResponse object
@@ -181,13 +191,14 @@ async def update_task(
         404 Not Found: If task doesn't exist
         403 Forbidden: If user is not the task owner
     """
-    return await update_task_service(task_id, task_update)
+    return await update_task_service(session, task_id, task_update)
 
 
 @router.delete("/{task_id}")
 async def delete_task(
     task_id: int,
     task: dict = Depends(get_task_or_404),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Delete task by ID.
@@ -198,6 +209,7 @@ async def delete_task(
 
     Args:
         task_id: ID of the task to delete (path parameter)
+        session: Database session (auto-injected)
 
     Returns:
         Success message
@@ -206,7 +218,7 @@ async def delete_task(
         404 Not Found: If task doesn't exist
         403 Forbidden: If user is not the task owner
     """
-    await delete_task_service(task_id)
+    await delete_task_service(session, task_id)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"message": f"Task {task_id} deleted"},

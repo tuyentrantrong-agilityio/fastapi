@@ -5,6 +5,8 @@ from ..schemas.project import ProjectCreate, ProjectResponse
 from ..schemas.task import TaskResponse
 from ..schemas.user import UserInDB
 from ..dependencies.user import get_current_user
+from ..db.session import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
 from ..services.project_service import (
     create_project_service,
     get_user_projects_service,
@@ -16,7 +18,9 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
-    project: ProjectCreate, current_user: UserInDB = Depends(get_current_user)
+    project: ProjectCreate,
+    current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Create a new project for current user.
@@ -31,11 +35,14 @@ async def create_project(
     Returns:
         Created project with id, user_id, timestamps, etc.
     """
-    return await create_project_service(project, current_user.id)
+    return await create_project_service(session, project, current_user.id)
 
 
 @router.get("/", response_model=List[ProjectResponse])
-async def get_all_projects(current_user: UserInDB = Depends(get_current_user)):
+async def get_all_projects(
+    current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
+):
     """
     Get all projects belonging to current user.
 
@@ -45,7 +52,7 @@ async def get_all_projects(current_user: UserInDB = Depends(get_current_user)):
     Returns:
         List of ProjectResponse objects for current user
     """
-    return await get_user_projects_service(current_user.id)
+    return await get_user_projects_service(session, current_user.id)
 
 
 @router.post("/{project_id}/tasks/{task_id}", response_model=TaskResponse)
@@ -53,6 +60,7 @@ async def assign_task_to_project(
     project_id: int,
     task_id: int,
     current_user: UserInDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Assign a task to this project.
@@ -72,4 +80,6 @@ async def assign_task_to_project(
         404 Not Found: If task or project doesn't exist
         403 Forbidden: If user is not the owner of task or project
     """
-    return await assign_task_to_project_service(project_id, task_id, current_user.id)
+    return await assign_task_to_project_service(
+        session, project_id, task_id, current_user.id
+    )
