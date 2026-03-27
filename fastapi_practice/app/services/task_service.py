@@ -4,19 +4,24 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 import math
 
+from sqlmodel import select
+from sqlalchemy import or_, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..schemas.task import TaskCreate, TaskUpdate
 from ..schemas.query import SortDirection
 from ..core.exceptions import BadRequestException, NotFoundException
-from sqlmodel import Session, select
-from sqlalchemy import or_, func
 from ..models.task import Task
 
 
-async def create_task_service(session: Session, task: TaskCreate, user_id: int) -> Task:
+async def create_task_service(
+    session: AsyncSession, task: TaskCreate, user_id: int
+) -> Task:
     """
     Create a new task for user.
 
     Args:
+        session: AsyncSession for database operations
         task: TaskCreate object
         user_id: ID of the user creating the task
 
@@ -27,14 +32,14 @@ async def create_task_service(session: Session, task: TaskCreate, user_id: int) 
     # Set user_id from parameter (not included in TaskCreate schema)
     new_task.user_id = user_id
     session.add(new_task)
-    session.commit()
-    session.refresh(new_task)
+    await session.commit()
+    await session.refresh(new_task)
 
     return new_task
 
 
 async def get_user_tasks_filtered_service(
-    session: Session,
+    session: AsyncSession,
     user_id: int,
     status_filter: Optional[str] = None,
     search: Optional[str] = None,
@@ -48,6 +53,7 @@ async def get_user_tasks_filtered_service(
     Get user's tasks with filtering, search, sorting, and pagination.
 
     Args:
+        session: AsyncSession for database operations
         user_id: ID of the user
         status_filter: Comma-separated status list
         search: Search term
@@ -123,11 +129,13 @@ async def get_user_tasks_filtered_service(
         select(func.count(Task.id)).select_from(Task).where(Task.user_id == user_id)
     )
     count_stmt = apply_filters(count_stmt)
-    total = session.exec(count_stmt).one()
+    count_result = await session.execute(count_stmt)
+    total = count_result.scalar()
 
     offset = (page - 1) * limit
     statement = statement.offset(offset).limit(limit)
-    items = session.exec(statement).all()
+    items_result = await session.execute(statement)
+    items = items_result.scalars().all()
     pages = math.ceil(total / limit) if total > 0 else 1
 
     return {
@@ -143,12 +151,13 @@ async def get_user_tasks_filtered_service(
 
 
 async def update_task_service(
-    session: Session, task_id: int, task_update: TaskUpdate
+    session: AsyncSession, task_id: int, task_update: TaskUpdate
 ) -> Task:
     """
     Update a task.
 
     Args:
+        session: AsyncSession for database operations
         task_id: ID of the task to update
         task_update: TaskUpdate object with fields to update
 
@@ -157,49 +166,56 @@ async def update_task_service(
     """
     # Fetch task from database
     statement = select(Task).where(Task.id == task_id)
-    task = session.exec(statement).first()
+    result = await session.execute(statement)
+    task = result.scalars().first()
     if not task:
         raise NotFoundException("Task not found")
 
     # Update task fields if provided
-    if task_update.title is not None:
-        task.title = task_update.title
+    # Method 1 is slow and too long
+    # if task_update.title is not None:
+    #     task.title = task_update.title
 
-    if task_update.description is not None:
-        task.description = task_update.description
+    # if task_update.description is not None:
+    #     task.description = task_update.description
 
-    if task_update.status is not None:
-        task.status = (
-            task_update.status.value
-            if hasattr(task_update.status, "value")
-            else task_update.status
-        )
-    # TODO: Need to improve project
+    # if task_update.status is not None:
+    #     task.status = (
+    #         task_update.status.value
+    #         if hasattr(task_update.status, "value")
+    #         else task_update.status
+    #     )
+    # Method 2 is faster and shorter
+    field_to_update = task_update.model_dump(exclude_unset=True)
+    for key, value in field_to_update.items():
+        setattr(task, key, value)
 
     # Update timestamp and persist changes
     task.updated_at = datetime.now(timezone.utc)
     session.add(task)
-    session.commit()
-    session.refresh(task)
+    await session.commit()
+    await session.refresh(task)
     return task
 
 
-async def delete_task_service(session: Session, task_id: int) -> dict:
+async def delete_task_service(session: AsyncSession, task_id: int) -> dict:
     """
     Delete a task.
 
     Args:
+        session: AsyncSession for database operations
         task_id: ID of the task to delete
 
     Returns:
         Dictionary with deleted task id and success message
     """
     statement = select(Task).where(Task.id == task_id)
-    task = session.exec(statement).first()
+    result = await session.execute(statement)
+    task = result.scalars().first()
     if not task:
         raise NotFoundException("Task not found")
 
     # Delete task from database
-    session.delete(task)
-    session.commit()
+    await session.delete(task)
+    await session.commit()
     return {"id": task_id, "message": "Task deleted successfully"}

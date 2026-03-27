@@ -1,19 +1,20 @@
 """User service - handles user business logic."""
 
-import email
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.user import UserCreate, UserUpdate
 from ..core.hashing import hash_password
 from ..core.exceptions import BadRequestException, ForbiddenException, NotFoundException
-from sqlmodel import Session, select
 from ..models.user import User
 
 
-async def create_user_service(session: Session, user: UserCreate) -> User:
+async def create_user_service(session: AsyncSession, user: UserCreate) -> User:
     """
     Create a new user.
 
     Args:
+        session: AsyncSession for database operations
         user: UserCreate object with email and password
 
     Returns:
@@ -24,8 +25,8 @@ async def create_user_service(session: Session, user: UserCreate) -> User:
     """
     # Check if email already exists
     statement = select(User).where(User.email == user.email)
-    result = session.exec(statement).first()
-    if result:
+    result = await session.execute(statement)
+    if result.scalars().first():
         raise BadRequestException("Email already registered")
     new_user = User(
         email=user.email,
@@ -35,34 +36,36 @@ async def create_user_service(session: Session, user: UserCreate) -> User:
 
     # Create new user
     session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
+    await session.commit()
+    await session.refresh(new_user)
 
     return new_user
 
 
-async def get_user_by_email_service(session: Session, email: str) -> User | None:
+async def get_user_by_email_service(session: AsyncSession, email: str) -> User | None:
     """
     Get user by email.
 
     Args:
+        session: AsyncSession for database operations
         email: User email address
 
     Returns:
         User object if found, None otherwise
     """
-
     statement = select(User).where(User.email == email)
-    return session.exec(statement).first()
+    result = await session.execute(statement)
+    return result.scalars().first()
 
 
 async def update_user_profile_service(
-    session: Session, user_id: int, user_update: UserUpdate, is_admin: bool
+    session: AsyncSession, user_id: int, user_update: UserUpdate, is_admin: bool
 ) -> User:
     """
     Update user profile.
 
     Args:
+        session: AsyncSession for database operations
         user_id: ID of the user to update
         user_update: UserUpdate object with fields to update
         is_admin: Whether the current user is an admin
@@ -74,8 +77,7 @@ async def update_user_profile_service(
         BadRequestException: If email already taken or invalid role
         ForbiddenException: If user tries to change role without admin access
     """
-
-    user = session.get(User, user_id)
+    user = await session.get(User, user_id)
     if not user:
         raise NotFoundException("User not found")
 
@@ -84,7 +86,8 @@ async def update_user_profile_service(
         statement = select(User).where(
             (User.email == user_update.email) & (User.id != user_id)
         )
-        if session.exec(statement).first():
+        result = await session.execute(statement)
+        if result.scalars().first():
             raise BadRequestException("Email already taken")
         user.email = user_update.email
 
@@ -102,6 +105,6 @@ async def update_user_profile_service(
 
     # Save changes
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
     return user
