@@ -1,21 +1,24 @@
 from fastapi import Depends
 
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.security import oauth2_scheme, decode_token
 from ..core.exceptions import UnauthorizedException, ForbiddenException
 from ..schemas.user import UserInDB
-
-from sqlmodel import Session, select
 from ..models.user import User
-from app.db.session import get_session
+from ..db.session import get_async_session
 
 
 async def get_current_user(
-    session: Session = Depends(get_session), token: str = Depends(oauth2_scheme)
+    session: AsyncSession = Depends(get_async_session),
+    token: str = Depends(oauth2_scheme),
 ) -> UserInDB:
     """
     Dependency to get current authenticated user from JWT token.
 
     Args:
+        session: AsyncSession for database operations
         token: JWT token from Authorization header (extracted by oauth2_scheme)
 
     Returns:
@@ -36,9 +39,9 @@ async def get_current_user(
         raise UnauthorizedException("Invalid or expired credentials")
 
     # Find user by email in database
-    user_data = None
     statement = select(User).where(User.email == email)
-    user_data = session.exec(statement).first()
+    result = await session.execute(statement)
+    user_data = result.scalars().first()
 
     if user_data is None:
         raise UnauthorizedException("Invalid or expired credentials")
