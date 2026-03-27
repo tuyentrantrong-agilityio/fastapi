@@ -1,61 +1,43 @@
+import sys
+import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from alembic import context
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 
-from alembic import context
-
-# Import SQLModel models for auto-migration detection
+# Import SQLModel models for Alembic to detect all tables
 from app.db.base import SQLModel
-from app.models import User, Task, Project  # ← Import models
+from app.models import User, Task, Project, RefreshToken
+from app.core.config import settings
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Set up loggers via logging config in .ini file
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
+# All ORM model metadata for 'autogenerate'
 target_metadata = SQLModel.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
-
+# def process_revision_directives(context, revision, directives):
+#     """
+#     Optional: Auto-imports for migration script if needed,
+#     usually not critical for basic use.
+#     """
+#     for directive in directives:
+#         if getattr(directive, "imports", None) is None:
+#             directive.imports = set()
+#         directive.imports.add("from sqlalchemy import Column, Integer, String")
 def process_revision_directives(context, revision, directives):
-    """Auto-import sqlmodel in generated migration files (Alembic hook).
-
-    Alembic calls this function before writing migration files.
-    We use it to ensure sqlmodel is imported when needed.
-    """
     for directive in directives:
-        if directive.imports is None:
+        if getattr(directive, "imports", None) is None:
             directive.imports = set()
-        # Add sqlmodel import to prevent NameError
         directive.imports.add("import sqlmodel")
-
-
-def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
-    url = config.get_main_option("sqlalchemy.url")
+def run_migrations_offline():
+    """Run Alembic migrations in 'offline' mode."""
+    url = settings.DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -63,36 +45,34 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         process_revision_directives=process_revision_directives,
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
-
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+def do_run_migrations(connection):
+    """Helper function for online (sync/async) migration."""
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        process_revision_directives=process_revision_directives,
+        compare_type=True,             # highly recommended!
+        compare_server_default=True,
+        render_as_batch=True if "sqlite" in str(connection.engine.url) else False  # Needed for SQLite migrations
     )
+    with context.begin_transaction():
+        context.run_migrations()
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            process_revision_directives=process_revision_directives,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
-
+async def run_migrations_online_async():
+    """Run Alembic migrations in 'online' mode using async engine."""
+    connectable = create_async_engine(
+        settings.DATABASE_URL,
+        poolclass=pool.NullPool,
+        echo=False
+    )
+    async with connectable.begin() as conn:
+        await conn.run_sync(do_run_migrations)
+    await connectable.dispose()
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online()
+    asyncio.run(run_migrations_online_async())
