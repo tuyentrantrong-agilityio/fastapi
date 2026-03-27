@@ -3,7 +3,9 @@
 from datetime import datetime, timezone, timedelta
 from typing import Dict, cast
 
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..core.hashing import verify_password
 from ..core.security import (
@@ -20,11 +22,14 @@ from ..models.user import User
 from .user_service import get_user_by_email_service
 
 
-async def login_service(session: Session, email: str, password: str) -> Dict[str, str]:
+async def login_service(
+    session: AsyncSession, email: str, password: str
+) -> Dict[str, str]:
     """
     Authenticate user and generate tokens.
 
     Args:
+        session: AsyncSession for database operations
         email: User email address
         password: User password (plain text)
 
@@ -63,8 +68,8 @@ async def login_service(session: Session, email: str, password: str) -> Dict[str
         + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     session.add(refresh_tokens)
-    session.commit()
-    session.refresh(refresh_tokens)
+    await session.commit()
+    await session.refresh(refresh_tokens)
 
     return {
         "access_token": access_token,
@@ -74,7 +79,7 @@ async def login_service(session: Session, email: str, password: str) -> Dict[str
 
 
 async def refresh_access_token_service(
-    session: Session, refresh_token: str
+    session: AsyncSession, refresh_token: str
 ) -> Dict[str, str]:
     """
     Refresh access token using refresh token.
@@ -87,6 +92,7 @@ async def refresh_access_token_service(
     5. Revoke old refresh token
 
     Args:
+        session: AsyncSession for database operations
         refresh_token: Valid refresh token from login (plain text)
 
     Returns:
@@ -97,21 +103,27 @@ async def refresh_access_token_service(
     """
     # Hash the refresh token client sent and look up in database
     token_hash = hash_refresh_token(refresh_token)
+    # statement = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    # result = await session.execute(statement)
+    # token_data = result.scalars().first()
     statement = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-    token_data = session.exec(statement).first()
+    result = await session.execute(statement)
+    token_data = result.scalars().first()
 
     if not token_data:
         raise UnauthorizedException("Invalid or expired refresh token")
-
+    expires_at = token_data.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
     # Check if token has expired
-    if datetime.now(timezone.utc) > token_data.expires_at:
+    if datetime.now(timezone.utc) > expires_at:
         # Persist deleted token
-        session.delete(token_data)
-        session.commit()
+        await session.delete(token_data)
         # TODO: For audit trail, mark as revoked instead of delete:
         # token_data.is_revoked = True
         # session.add(token_data)
         # session.commit()
+        await session.commit()
         raise UnauthorizedException("Refresh token has expired")
 
     # Get user associated with token
@@ -140,9 +152,9 @@ async def refresh_access_token_service(
     )
 
     # Revoke old refresh token and create new one in single transaction
-    session.delete(token_data)
+    await session.delete(token_data)
     session.add(new_refresh_token_record)
-    session.commit()
+    await session.commit()
 
     return {
         "access_token": new_access_token,
