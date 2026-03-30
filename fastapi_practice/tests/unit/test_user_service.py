@@ -1,314 +1,271 @@
-"""Unit tests for user service functions."""
+"""Unit tests for user service functions with mocked AsyncSession."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.services.user_service import (
     create_user_service,
     get_user_by_email_service,
     update_user_profile_service,
 )
 from app.schemas.user import UserCreate, UserUpdate
-from app.core.exceptions import BadRequestException, ForbiddenException
+from app.models.user import User
+from app.core.exceptions import (
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+)
 
 
-@pytest.fixture
-def user_create_data():
-    """Sample user creation data."""
-    return UserCreate(
-        email="test@example.com",
-        password="testpassword123",
+def make_user(
+    id=1, email="test@example.com", hashed_password="hash_pwd_123", role="user"
+):
+    """Helper to create User model instance."""
+    user = User(
+        id=id,
+        email=email,
+        hashed_password=hashed_password,
+        role=role,
     )
-
-
-@pytest.fixture
-def sample_user():
-    """Sample user from database."""
-    return {
-        "id": 1,
-        "email": "test@example.com",
-        "hashed_password": "$argon2id$v=19$m=65540,t=3,p=4$...",
-        "is_active": True,
-        "role": "user",
-    }
+    return user
 
 
 class TestCreateUserService:
-    """Test create_user_service function."""
+    """Test cases for create_user_service."""
 
     @pytest.mark.asyncio
-    async def test_create_user_success(self):
+    async def test_success(self):
         """Should successfully create new user."""
-        with (
-            patch("app.services.user_service.users_db", {}),
-            patch("app.services.user_service.user_id_counter", {"id": 1}),
-            patch("app.services.user_service.hash_password", return_value="hashed_pwd"),
-        ):
-            user_create = UserCreate(
-                email="newuser@example.com",
-                password="password123",
-            )
 
-            result = await create_user_service(user_create)
+        # --- Mock session and database query (no existing user with this email) ---
+        session = AsyncMock(spec=AsyncSession)
+        query_result = MagicMock()
+        query_result.scalars.return_value.first.return_value = (
+            None  # Simulate: email not found
+        )
+        session.execute.return_value = query_result
 
-            assert result["email"] == "newuser@example.com"
-            assert result["role"] == "user"
-            assert "id" in result
-            assert "hashed_password" not in result
+        # --- Mock DB operations (add, commit, refresh) ---
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        def side_effect_refresh(user):
+            user.id = 1  # Simulate: database assigns new ID
+
+        session.refresh.side_effect = side_effect_refresh
+
+        # --- Prepare input DTO ---
+        user_create = UserCreate(email="newuser@example.com", password="password123")
+
+        # --- Call the service function under test ---
+        result = await create_user_service(session, user_create)
+
+        # --- Assert correct behavior and DB calls ---
+        session.execute.assert_awaited_once()  # Check query was executed
+        session.add.assert_called_once()  # User added to session
+        session.commit.assert_awaited_once()  # Changes committed
+        session.refresh.assert_awaited_once()  # User refreshed with DB-assigned ID
+        assert result.email == "newuser@example.com"
+        assert result.role == "user"
 
     @pytest.mark.asyncio
-    async def test_create_user_duplicate_email(self):
+    async def test_duplicate_email(self):
         """Should raise error if email already exists."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "existing@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
 
-        with (
-            patch("app.services.user_service.users_db", mock_users_db),
-            patch("app.services.user_service.user_id_counter", {"id": 2}),
-        ):
-            user_create = UserCreate(
-                email="existing@example.com",
-                password="password123",
-            )
+        # --- Mock session and simulated existing user in database ---
+        session = AsyncMock(spec=AsyncSession)
+        existing_user = make_user(id=1, email="existing@example.com")
+        query_result = MagicMock()
+        query_result.scalars.return_value.first.return_value = (
+            existing_user  # Simulate: user exists
+        )
+        session.execute.return_value = query_result
 
-            with pytest.raises(BadRequestException) as exc_info:
-                await create_user_service(user_create)
+        # --- Prepare input DTO with duplicate email ---
+        user_create = UserCreate(email="existing@example.com", password="password123")
 
-            assert "Email already registered" in str(exc_info.value.message)
+        # --- Call and verify exception is raised ---
+        with pytest.raises(BadRequestException, match="Email already registered"):
+            await create_user_service(session, user_create)
 
-    @pytest.mark.asyncio
-    async def test_create_user_increments_id(self):
-        """Should increment user ID counter."""
-        mock_counter = {"id": 5}
-
-        with (
-            patch("app.services.user_service.users_db", {}),
-            patch("app.services.user_service.user_id_counter", mock_counter),
-            patch("app.services.user_service.hash_password", return_value="hashed"),
-        ):
-            user_create = UserCreate(
-                email="test@example.com",
-                password="password123",
-            )
-
-            await create_user_service(user_create)
-
-            assert mock_counter["id"] == 6
+        # --- Assert service stopped before DB modifications ---
+        session.execute.assert_awaited_once()  # Only query executed
+        session.add.assert_not_called()  # No user added (error thrown)
 
 
 class TestGetUserByEmailService:
-    """Test get_user_by_email_service function."""
+    """Test cases for get_user_by_email_service."""
 
     @pytest.mark.asyncio
-    async def test_get_user_by_email_found(self):
-        """Should return user when email exists."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "test@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
+    async def test_found(self):
+        """Should return user if email exists."""
 
-        with patch("app.services.user_service.users_db", mock_users_db):
-            result = await get_user_by_email_service("test@example.com")
+        # --- Mock session and simulated user in database ---
+        session = AsyncMock(spec=AsyncSession)
+        found_user = make_user(id=1, email="user@example.com")
+        query_result = MagicMock()
+        query_result.scalars.return_value.first.return_value = (
+            found_user  # Simulate: user found
+        )
+        session.execute.return_value = query_result
 
-            assert result is not None
-            assert result["email"] == "test@example.com"
-            assert result["id"] == 1
+        # --- Call the service function under test ---
+        result = await get_user_by_email_service(session, "user@example.com")
 
-    @pytest.mark.asyncio
-    async def test_get_user_by_email_not_found(self):
-        """Should return None when email doesn't exist."""
-        with patch("app.services.user_service.users_db", {}):
-            result = await get_user_by_email_service("nonexistent@example.com")
-
-            assert result is None
+        # --- Assert correct database query and result ---
+        session.execute.assert_awaited_once()  # Query executed
+        assert result == found_user  # Correct user returned
+        assert result.email == "user@example.com"
 
     @pytest.mark.asyncio
-    async def test_get_user_by_email_case_sensitive(self):
-        """Email lookup should work with exact case."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "Test@Example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
+    async def test_not_found(self):
+        """Should return None if email not exists."""
 
-        with patch("app.services.user_service.users_db", mock_users_db):
-            # Exact case should work
-            result = await get_user_by_email_service("Test@Example.com")
-            assert result is not None
+        # --- Mock session with no user found ---
+        session = AsyncMock(spec=AsyncSession)
+        query_result = MagicMock()
+        query_result.scalars.return_value.first.return_value = (
+            None  # Simulate: no user found
+        )
+        session.execute.return_value = query_result
 
-            # Different case should not match
-            result = await get_user_by_email_service("test@example.com")
-            assert result is None
+        # --- Call the service function under test ---
+        result = await get_user_by_email_service(session, "nonexistent@example.com")
 
-    @pytest.mark.asyncio
-    async def test_get_user_by_email_multiple_users(self):
-        """Should find correct user among multiple users."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "user1@example.com",
-                "hashed_password": "hash1",
-                "is_active": True,
-                "role": "user",
-            },
-            2: {
-                "id": 2,
-                "email": "user2@example.com",
-                "hashed_password": "hash2",
-                "is_active": True,
-                "role": "user",
-            },
-            3: {
-                "id": 3,
-                "email": "user3@example.com",
-                "hashed_password": "hash3",
-                "is_active": True,
-                "role": "admin",
-            },
-        }
-
-        with patch("app.services.user_service.users_db", mock_users_db):
-            result = await get_user_by_email_service("user2@example.com")
-
-            assert result is not None
-            assert result["id"] == 2
-            assert result["email"] == "user2@example.com"
-            assert result["role"] == "user"
+        # --- Assert query executed and None returned ---
+        session.execute.assert_awaited_once()  # Query executed
+        assert result is None  # No user found returns None
 
 
 class TestUpdateUserProfileService:
-    """Test update_user_profile_service function."""
+    """Test cases for update_user_profile_service."""
 
     @pytest.mark.asyncio
-    async def test_update_user_email(self):
-        """Should update user email."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "old@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
+    async def test_success(self):
+        """Should successfully update user profile if email is unique and user exists."""
 
-        with patch("app.services.user_service.users_db", mock_users_db):
-            update_data = UserUpdate(email="new@example.com")
-            result = await update_user_profile_service(1, update_data, is_admin=False)
+        # --- Mock session and database user ---
+        session = AsyncMock(spec=AsyncSession)
+        existing_user = make_user(id=1, email="user@example.com", role="user")
+        session.get.return_value = (
+            existing_user  # session.get() will return our test user
+        )
 
-            assert result["email"] == "new@example.com"
-            assert result["id"] == 1
+        # --- Mock DB operations (add, commit, refresh) ---
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        # --- Mock check for duplicate email (simulate no other user with same email) ---
+        mock_execute_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.first.return_value = (
+            None  # Simulate: no user found with this email
+        )
+        mock_execute_result.scalars.return_value = mock_scalars
+        session.execute.return_value = mock_execute_result
+
+        # --- Prepare input DTO for user update ---
+        user_update = UserUpdate(email="newemail@example.com")
+
+        # --- Call the service function under test ---
+        result = await update_user_profile_service(
+            session, 1, user_update, is_admin=False
+        )
+
+        # --- Assert correct behavior and DB calls ---
+        session.get.assert_awaited_once_with(User, 1)
+        session.add.assert_called_once()
+        session.commit.assert_awaited_once()
+        session.refresh.assert_awaited_once()
+        assert result.email == "newemail@example.com"
 
     @pytest.mark.asyncio
-    async def test_update_user_password(self):
-        """Should update user password."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "test@example.com",
-                "hashed_password": "old_hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
+    async def test_user_not_found(self):
+        """Should raise NotFoundException if user not found."""
 
-        with (
-            patch("app.services.user_service.users_db", mock_users_db),
-            patch("app.services.user_service.hash_password", return_value="new_hash"),
+        # --- Mock session with no user found ---
+        session = AsyncMock(spec=AsyncSession)
+        session.get.return_value = None  # Simulate: user doesn't exist
+
+        # --- Prepare input DTO ---
+        user_update = UserUpdate(email="new@example.com")
+
+        # --- Call and verify exception is raised ---
+        with pytest.raises(NotFoundException, match="User not found"):
+            await update_user_profile_service(session, 999, user_update, is_admin=False)
+
+        # --- Assert service attempted to fetch user ---
+        session.get.assert_awaited_once_with(
+            User, 999
+        )  # Lookup attempted for user ID 999
+
+    @pytest.mark.asyncio
+    async def test_duplicate_email(self):
+        """Should raise error if new email already taken."""
+
+        # --- Mock session and existing user ---
+        session = AsyncMock(spec=AsyncSession)
+        existing_user = make_user(id=1, email="user@example.com")
+        session.get.return_value = existing_user  # User to update
+
+        # --- Mock query showing another user already has the target email ---
+        other_user = make_user(id=2, email="taken@example.com")
+        query_result = MagicMock()
+        query_result.scalars.return_value.first.return_value = (
+            other_user  # Simulate: email taken
+        )
+        session.execute.return_value = query_result
+
+        # --- Prepare input DTO with duplicate email ---
+        user_update = UserUpdate(email="taken@example.com")
+
+        # --- Call and verify exception is raised ---
+        with pytest.raises(BadRequestException, match="Email already taken"):
+            await update_user_profile_service(session, 1, user_update, is_admin=False)
+
+    @pytest.mark.asyncio
+    async def test_admin_change_role(self):
+        """Should allow admin to change user role."""
+
+        # --- Mock session and existing user ---
+        session = AsyncMock(spec=AsyncSession)
+        existing_user = make_user(id=1, email="user@example.com", role="user")
+        session.get.return_value = existing_user
+
+        # --- Mock DB operations ---
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+        session.refresh = AsyncMock()
+
+        # --- Prepare role update from admin user ---
+        user_update = UserUpdate(role="admin")
+
+        # --- Call the service function with admin=True ---
+        result = await update_user_profile_service(
+            session, 1, user_update, is_admin=True
+        )
+
+        # --- Assert role was successfully updated ---
+        assert result.role == "admin"  # Role changed
+        session.commit.assert_awaited_once()  # Changes committed
+
+    @pytest.mark.asyncio
+    async def test_non_admin_cannot_change_role(self):
+        """Should forbid non-admin from changing role."""
+
+        # --- Mock session and existing user ---
+        session = AsyncMock(spec=AsyncSession)
+        existing_user = make_user(id=1, email="user@example.com", role="user")
+        session.get.return_value = existing_user
+
+        # --- Prepare role update attempt by non-admin ---
+        user_update = UserUpdate(role="admin")
+
+        # --- Call with is_admin=False and verify exception is raised ---
+        with pytest.raises(
+            ForbiddenException, match="Only admin users can change roles"
         ):
-            update_data = UserUpdate(password="newpassword123")
-            result = await update_user_profile_service(1, update_data, is_admin=False)
-
-            assert result["email"] == "test@example.com"
-            assert result["id"] == 1
-
-    @pytest.mark.asyncio
-    async def test_update_user_duplicate_email(self):
-        """Should raise error if new email already exists."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "user1@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            },
-            2: {
-                "id": 2,
-                "email": "user2@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            },
-        }
-
-        with patch("app.services.user_service.users_db", mock_users_db):
-            update_data = UserUpdate(email="user2@example.com")
-
-            with pytest.raises(BadRequestException):
-                await update_user_profile_service(1, update_data, is_admin=False)
-
-    @pytest.mark.asyncio
-    async def test_update_user_not_found(self):
-        """Should raise error if user not found."""
-        with patch("app.services.user_service.users_db", {}):
-            update_data = UserUpdate(email="new@example.com")
-
-            with pytest.raises(KeyError):
-                await update_user_profile_service(999, update_data, is_admin=False)
-
-    @pytest.mark.asyncio
-    async def test_update_user_role_requires_admin(self):
-        """Should require admin to update role."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "user@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
-
-        with patch("app.services.user_service.users_db", mock_users_db):
-            # Regular user (not admin) trying to change role
-            update_data = UserUpdate(role="admin")
-
-            with pytest.raises(ForbiddenException):
-                await update_user_profile_service(1, update_data, is_admin=False)
-
-    @pytest.mark.asyncio
-    async def test_update_user_with_no_changes(self):
-        """Should handle update with no fields."""
-        mock_users_db = {
-            1: {
-                "id": 1,
-                "email": "test@example.com",
-                "hashed_password": "hash",
-                "is_active": True,
-                "role": "user",
-            }
-        }
-
-        with patch("app.services.user_service.users_db", mock_users_db):
-            update_data = UserUpdate()  # Empty update
-            result = await update_user_profile_service(1, update_data, is_admin=False)
-
-            # Should still return user data
-            assert result["id"] == 1
-            assert result["email"] == "test@example.com"
+            await update_user_profile_service(session, 1, user_update, is_admin=False)
