@@ -180,8 +180,8 @@ class TestProtectedEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == test_user["id"]
-        assert data["email"] == test_user["email"]
+        assert data["id"] == test_user.id
+        assert data["email"] == test_user.email
 
     def test_get_profile_without_token(self, client):
         """
@@ -220,7 +220,7 @@ class TestProtectedEndpoint:
         from datetime import timedelta
 
         expired_token = create_access_token(
-            data={"sub": test_user["email"]},
+            data={"sub": test_user.email},
             expires_delta=timedelta(seconds=-1),  # Already expired
         )
 
@@ -286,7 +286,7 @@ class TestUpdateProfile:
         login_response = client.post(
             "/users/login",
             data={
-                "username": test_user["email"],
+                "username": test_user.email,
                 "password": new_password,
             },
         )
@@ -299,24 +299,23 @@ class TestUpdateProfile:
 
         Should return 400 Bad Request.
         """
-        # Create another user
-        from app.db.storage import users_db, user_id_counter
-        from app.core.hashing import hash_password
+        # Register another user to create duplicate email scenario
+        other_email = "other@example.com"
+        other_password = "otherpass123"
 
-        other_user_id = user_id_counter["id"]
-        user_id_counter["id"] += 1
-        users_db[other_user_id] = {
-            "id": other_user_id,
-            "email": "other@example.com",
-            "hashed_password": hash_password("otherpass123"),
-            "is_active": True,
-            "role": "user",
-        }
+        register_response = client.post(
+            "/users/register",
+            json={
+                "email": other_email,
+                "password": other_password,
+            },
+        )
+        assert register_response.status_code == 201
 
         # Try to update current user's email to the other user's email
         response = client.put(
             "/users/me",
-            json={"email": "other@example.com"},
+            json={"email": other_email},
             headers=auth_headers,
         )
 

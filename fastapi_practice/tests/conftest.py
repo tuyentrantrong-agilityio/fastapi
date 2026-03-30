@@ -3,56 +3,112 @@ Pytest configuration and shared fixtures for all tests.
 
 This module provides fixtures for:
 - FastAPI test client
-- Test database reset
+- Test database
 - Test user creation and authentication
+- Async database session for unit testing
 """
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from datetime import timedelta
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import insert
 
 from app.main import app
 from app.core.security import create_access_token
 from app.core.hashing import hash_password
-from app.db.storage import (
-    users_db,
-    tasks_db,
-    projects_db,
-    refresh_tokens_db,
-    user_id_counter,
-    task_id_counter,
-    project_id_counter,
-)
+from app.db.base import SQLModel
+from app.db.session import get_async_session
+from app.models.user import User
+
+
+@pytest_asyncio.fixture
+async def async_engine():
+    """Create an async engine for testing (function-scoped per test).
+
+    Uses SQLite file (test_app.db) instead of in-memory for better
+    test isolation and persistence. Database is reset between tests.
+    """
+    import os
+
+    # Use SQLite file in project root
+    db_file = "test_app.db"
+    db_url = f"sqlite+aiosqlite:///./{db_file}"
+
+    engine = create_async_engine(
+        db_url,
+        echo=False,
+        future=True,
+    )
+
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    yield engine
+
+    # Cleanup: drop all tables and close engine
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+
+    await engine.dispose()
+
+    # Delete test database file
+    if os.path.exists(db_file):
+        os.remove(db_file)
+
+
+@pytest_asyncio.fixture
+async def async_session(async_engine):
+    """
+    Provide an async database session for unit testing.
+
+    Creates an in-memory SQLite database, initializes tables,
+    yields the session, then cleans up.
+
+    Usage:
+        async def test_something(async_session: AsyncSession):
+            ...
+    """
+    # Create async session factory
+    async_session_maker = async_sessionmaker(
+        async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+
+    # Yield session
+    async with async_session_maker() as session:
+        yield session
 
 
 @pytest.fixture
-def client():
+def client(async_engine):
     """
-    Provide a FastAPI test client.
+    Provide a FastAPI test client with async database override.
 
     Returns:
         TestClient: FastAPI test client for making HTTP requests
     """
-    return TestClient(app)
 
+    def override_get_async_session_factory():
+        async def override_get_async_session():
+            async_session_maker = async_sessionmaker(
+                async_engine,
+                class_=AsyncSession,
+                expire_on_commit=False,
+                autoflush=False,
+            )
+            async with async_session_maker() as session:
+                yield session
 
-@pytest.fixture(autouse=True)
-def reset_database():
-    """
-    Reset database before each test.
+        return override_get_async_session
 
-    Clears all data from users_db, tasks_db, projects_db, refresh_tokens_db
-    and resets ID counters. This fixture runs automatically before every test
-    to ensure clean state.
-    """
-    users_db.clear()
-    tasks_db.clear()
-    projects_db.clear()
-    refresh_tokens_db.clear()
-    user_id_counter["id"] = 1
-    task_id_counter["id"] = 1
-    project_id_counter["id"] = 1
-    yield
+    app.dependency_overrides[get_async_session] = override_get_async_session_factory()
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -69,51 +125,66 @@ def test_user_data():
     }
 
 
-@pytest.fixture
-def test_user(test_user_data):
+@pytest_asyncio.fixture
+async def test_user(test_user_data, async_session):
     """
-    Create a test user in the database.
+    Create a test user in the async database.
 
     Args:
         test_user_data: User credentials fixture
+        async_session: Async database session
 
     Returns:
-        dict: Created user data with id, email, hashed_password, role
+        User: Created user object
     """
-    user_id = user_id_counter["id"]
-    user_id_counter["id"] += 1
+    from app.services.user_service import create_user_service
+    from app.schemas.user import UserCreate
 
-    users_db[user_id] = {
-        "id": user_id,
-        "email": test_user_data["email"],
-        "hashed_password": hash_password(test_user_data["password"]),
-        "is_active": True,
-        "role": "user",
-    }
+    user_create = UserCreate(
+        email=test_user_data["email"],
+        password=test_user_data["password"],
+    )
+    user = await create_user_service(
+        session=async_session,
+        user=user_create,
+    )
 
-    return users_db[user_id]
+    await async_session.commit()
+    await async_session.refresh(user)
+
+    return user
 
 
-@pytest.fixture
-def test_admin_user():
+@pytest_asyncio.fixture
+async def test_admin_user(async_session):
     """
-    Create a test admin user in the database.
+    Create a test admin user in the async database.
+
+    Args:
+        async_session: Async database session
 
     Returns:
-        dict: Created admin user data
+        User: Created admin user object
     """
-    user_id = user_id_counter["id"]
-    user_id_counter["id"] += 1
+    from app.services.user_service import create_user_service
+    from app.schemas.user import UserCreate
 
-    users_db[user_id] = {
-        "id": user_id,
-        "email": "admin@example.com",
-        "hashed_password": hash_password("admin123"),
-        "is_active": True,
-        "role": "admin",
-    }
+    admin_create = UserCreate(
+        email="admin@example.com",
+        password="admin123",
+    )
+    admin = await create_user_service(
+        session=async_session,
+        user=admin_create,
+    )
 
-    return users_db[user_id]
+    # Set role to admin
+    admin.role = "admin"
+
+    await async_session.commit()
+    await async_session.refresh(admin)
+
+    return admin
 
 
 @pytest.fixture
@@ -129,7 +200,7 @@ def user_token(test_user):
     """
     access_token_expires = timedelta(minutes=30)
     token = create_access_token(
-        data={"sub": test_user["email"]},
+        data={"sub": test_user.email},
         expires_delta=access_token_expires,
     )
     return token
@@ -148,7 +219,7 @@ def admin_token(test_admin_user):
     """
     access_token_expires = timedelta(minutes=30)
     token = create_access_token(
-        data={"sub": test_admin_user["email"]},
+        data={"sub": test_admin_user.email},
         expires_delta=access_token_expires,
     )
     return token
@@ -182,26 +253,33 @@ def admin_auth_headers(admin_token):
     return {"Authorization": f"Bearer {admin_token}"}
 
 
-@pytest.fixture
-def test_user_2(test_user_data):
+@pytest_asyncio.fixture
+async def test_user_2(async_session):
     """
-    Create a second test user in the database for authorization testing.
+    Create a second test user in the async database for authorization testing.
+
+    Args:
+        async_session: Async database session
 
     Returns:
-        dict: Created user data with id, email, hashed_password, role
+        User: Created user object
     """
-    user_id = user_id_counter["id"]
-    user_id_counter["id"] += 1
+    from app.services.user_service import create_user_service
+    from app.schemas.user import UserCreate
 
-    users_db[user_id] = {
-        "id": user_id,
-        "email": "testuser2@example.com",
-        "hashed_password": hash_password("pass5678"),
-        "is_active": True,
-        "role": "user",
-    }
+    user_create = UserCreate(
+        email="testuser2@example.com",
+        password="pass5678",
+    )
+    user = await create_user_service(
+        session=async_session,
+        user=user_create,
+    )
 
-    return users_db[user_id]
+    await async_session.commit()
+    await async_session.refresh(user)
+
+    return user
 
 
 @pytest.fixture
@@ -217,7 +295,7 @@ def user_token_2(test_user_2):
     """
     access_token_expires = timedelta(minutes=30)
     token = create_access_token(
-        data={"sub": test_user_2["email"]},
+        data={"sub": test_user_2.email},
         expires_delta=access_token_expires,
     )
     return token

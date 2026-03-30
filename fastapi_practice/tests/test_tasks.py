@@ -11,7 +11,6 @@ Comprehensive tests covering:
 import pytest
 from fastapi import status
 from datetime import datetime, timezone
-from app.db.storage import tasks_db, task_id_counter
 
 
 @pytest.fixture
@@ -546,4 +545,4 @@ class TestTaskDataConsistency:
 
         updated_task = response.json()
         assert updated_task["user_id"] == original_user_id
-        assert updated_task["user_id"] == test_user["id"]
+        assert updated_task["user_id"] == test_user.id
