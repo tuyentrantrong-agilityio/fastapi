@@ -11,7 +11,7 @@ from ..models.task import Task
 from ..db.session import get_async_session
 
 
-async def get_task_or_404(
+async def get_owned_task_or_error(
     task_id: int,
     session: AsyncSession = Depends(get_async_session),
     current_user: UserInDB = Depends(get_current_user),
@@ -28,18 +28,20 @@ async def get_task_or_404(
         Task data
 
     Raises:
-        NotFoundException: If task not found
-        ForbiddenException: If user is not the task owner
+        NotFoundException: If task not found (404)
+        ForbiddenException: If user is not the task owner (403)
     """
     statement = select(Task).where(Task.id == task_id)
     result = await session.execute(statement)
     task = result.scalars().first()
 
     if not task:
+        # Task not found => Raise 404 NotFound
         raise NotFoundException("Task", task_id)
 
     # Verify ownership
     if task.user_id != current_user.id:
+        # User is not the owner => Raise 403 Forbidden
         raise ForbiddenException("You don't have permission to access this task")
 
     return task

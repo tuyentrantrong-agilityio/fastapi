@@ -8,7 +8,7 @@ from ..schemas.user import UserInDB
 from ..schemas.query import TaskFilterParams, SortDirection
 from ..core.exceptions import BadRequestException
 from ..dependencies.user import get_current_user
-from ..dependencies.task import get_task_or_404
+from ..dependencies.task import get_owned_task_or_error
 from ..db.session import get_async_session
 from ..services.task_service import (
     create_task_service,
@@ -143,7 +143,7 @@ async def get_all_tasks(
 @router.get("/{task_id}", response_model=TaskResponse)
 async def get_task(
     task_id: int,
-    task: dict = Depends(get_task_or_404),
+    task: dict = Depends(get_owned_task_or_error),
 ):
     """
     Get task by ID.
@@ -169,7 +169,7 @@ async def get_task(
 async def update_task(
     task_id: int,
     task_update: TaskUpdate,
-    task: dict = Depends(get_task_or_404),
+    task: dict = Depends(get_owned_task_or_error),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -197,7 +197,7 @@ async def update_task(
 @router.delete("/{task_id}")
 async def delete_task(
     task_id: int,
-    task: dict = Depends(get_task_or_404),
+    task: dict = Depends(get_owned_task_or_error),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
