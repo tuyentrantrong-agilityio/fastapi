@@ -1,6 +1,6 @@
 # FastAPI Task Management Application
 
-A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 122 comprehensive tests (40 unit tests + 82 integration tests).
+A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 134 comprehensive tests (52 unit tests + 82 integration tests).
 
 ## Overview
 
@@ -11,7 +11,7 @@ This project builds a production-like task management API with:
 - Role-based access control (user vs admin)
 - Task ownership enforcement (users can only access their own tasks)
 - Project management with task assignments
-- **122 comprehensive tests** (40 unit tests + 82 integration tests)
+- **134 comprehensive tests** (52 unit tests + 82 integration tests)
 - Modular architecture with clear separation of concerns
 
 ## Tech Stack
@@ -150,22 +150,24 @@ fastapi_practice/
 │   │   └── [migration files]   # e.g., *_create_user_table.py
 │   └── README                   # Alembic documentation
 │
-├── tests/                       # Test suite (122 tests total)
+├── tests/                       # Test suite (134 tests total)
 │   ├── __init__.py
 │   ├── conftest.py             # Pytest fixtures and database setup
 │   │
-│   ├── unit/                   # Unit tests (40 tests - Business logic with mocks)
+│   ├── unit/                   # Unit tests (52 tests - Business logic with mocks)
 │   │   ├── __init__.py
 │   │   ├── test_auth_service.py         # Login & refresh token logic
 │   │   ├── test_user_service.py        # User CRUD operations
 │   │   ├── test_task_service.py        # Task business logic & filtering
-│   │   └── test_project_service.py     # Project business logic
+│   │   ├── test_project_service.py     # Project business logic
+│   │   └── test_security.py            # JWT token generation, validation & hashing
 │   │
 │   ├── test_auth.py            # Integration: User authentication (26 tests)
 │   ├── test_tasks.py           # Integration: Task CRUD via HTTP (38 tests)
 │   └── test_projects.py        # Integration: Project management (18 tests)
 │
-├── requirements.txt             # Python dependencies
+├── pyproject.toml              # Project metadata, dependencies & pytest config
+├── pyrightconfig.json          # Pyright type checking config
 ├── pyproject.toml              # Project metadata & pytest config
 ├── pyrightconfig.json          # Pyright type checking config
 ├── .env.example                # Example environment variables
