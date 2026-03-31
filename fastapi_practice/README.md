@@ -43,7 +43,7 @@ git clone git@gitlab.asoft-python.com:tuyen.trantrong/python.git
 #### 2. Navigate to directory
 ```bash
 cd python
-git checkout feat/fastapi-practice
+git checkout feat/database-integration
 cd fastapi_practice
 ```
 
@@ -71,7 +71,7 @@ source .venv/bin/activate
 
 #### 5. Install dependencies
 ```bash
-python -m pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 #### 6. Copy file config
