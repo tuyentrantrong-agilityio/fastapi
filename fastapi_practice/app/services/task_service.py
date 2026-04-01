@@ -86,7 +86,7 @@ async def get_user_tasks_filtered_service(
             status_list = [s.strip() for s in status_filter.split(",") if s.strip()]
             if status_list:
                 # stmt = stmt.where(Task.status in status_list)
-                stmt = stmt.where(Task.status.in_(status_list))
+                stmt = stmt.where(getattr(Task, "status").in_(status_list))
 
         # Filter by search (case-insensitive LIKE on title/description)
         if search:

@@ -31,7 +31,7 @@ This project builds a production-like task management API with:
 
 Before you begin, ensure you have the following installed:
 - Python 3.11 or higher
-- pip (Python package manager)
+- uv (Python package manager and runner)
 
 ### Quick Start
 
@@ -47,41 +47,19 @@ git checkout feat/database-integration
 cd fastapi_practice
 ```
 
-#### 3. Create virtual environment
+#### 3. Install dependencies
 ```bash
-python -m venv .venv
+uv sync --extra dev
 ```
 
-#### 4. Activate venv
-
-**PowerShell (Windows):**
-```bash
-.\.venv\Scripts\Activate.ps1
-```
-
-**cmd (Windows):**
-```bash
-.venv\Scripts\activate.bat
-```
-
-**macOS/Linux:**
-```bash
-source .venv/bin/activate
-```
-
-#### 5. Install dependencies
-```bash
-pip install -e ".[dev]"
-```
-
-#### 6. Copy file config
+#### 4. Copy file config
 ```bash
 cp .env.example .env
 ```
 
-#### 7. Run uvicorn
+#### 5. Run uvicorn
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 #### 4. Access Application
@@ -279,7 +257,7 @@ Before running the application for the first time, you need to apply migrations:
 
 ```bash
 # Apply all migrations to create database schema
-alembic upgrade head
+uv run alembic upgrade head
 ```
 
 This command:
@@ -291,10 +269,10 @@ This command:
 
 ```bash
 # 1. Apply migrations (one-time setup)
-alembic upgrade head
+uv run alembic upgrade head
 
 # 2. Run the server
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 
 # Access at http://localhost:8000/docs
 ```
@@ -303,19 +281,19 @@ uvicorn app.main:app --reload
 
 ```bash
 # Check current migration status
-alembic current
+uv run alembic current
 
 # Create new migration after modifying models
-alembic revision --autogenerate -m "description of changes"
+uv run alembic revision --autogenerate -m "description of changes"
 
 # Upgrade to latest version
-alembic upgrade head
+uv run alembic upgrade head
 
 # Downgrade to previous version
-alembic downgrade -1
+uv run alembic downgrade -1
 
 # View migration history
-alembic history
+uv run alembic history
 ```
 
 ### Alembic Directory Structure
@@ -352,28 +330,28 @@ This project uses **two types of tests**:
 
 ```bash
 # Run all tests (122 total)
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run only unit tests (40 tests)
-pytest tests/unit/ -v
+uv run pytest tests/unit/ -v
 
 # Run only integration tests (82 tests)
-pytest tests/ --ignore=tests/unit -v
+uv run pytest tests/ --ignore=tests/unit -v
 
 # Run specific test file
-pytest tests/unit/test_auth_service.py -v
+uv run pytest tests/unit/test_auth_service.py -v
 
 # Run specific test class
-pytest tests/unit/test_auth_service.py::TestLoginService -v
+uv run pytest tests/unit/test_auth_service.py::TestLoginService -v
 
 # Run specific test
-pytest tests/unit/test_auth_service.py::TestLoginService::test_login_success -v
+uv run pytest tests/unit/test_auth_service.py::TestLoginService::test_login_success -v
 
 # Quick check (quiet mode)
-pytest tests/unit/ -q
+uv run pytest tests/unit/ -q
 
 # Generate coverage report
-pytest tests/ --cov=app --cov-report=html
+uv run pytest tests/ --cov=app --cov-report=html
 ```
 
 ### Test Coverage
@@ -482,13 +460,13 @@ This project demonstrates key FastAPI concepts in a structured progression:
 
 ```bash
 # Run pytest with verbose output and print statements
-pytest tests/unit/test_auth_service.py -v -s
+uv run pytest tests/unit/test_auth_service.py -v -s
 
 # Run specific test with debugging
-pytest tests/unit/test_auth_service.py::TestLoginService::test_success -v -s --tb=short
+uv run pytest tests/unit/test_auth_service.py::TestLoginService::test_success -v -s --tb=short
 
 # Drop into pdb debugger on failure
-pytest tests/unit/ -v --pdb
+uv run pytest tests/unit/ -v --pdb
 ```
 
 ## Environment Variables
@@ -531,7 +509,7 @@ pytest tests/unit/ -v --pdb
 **Solution**:
 ```bash
 # Run on different port
-uvicorn app.main:app --port 8001 --reload
+uv run uvicorn app.main:app --port 8001 --reload
 ```
 
 ## License
