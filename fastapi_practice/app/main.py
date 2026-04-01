@@ -1,13 +1,25 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from .core.config import settings
 from .core.handlers import register_exception_handlers
+from .db.init_db import create_db_and_tables
 from .routers import user, task, project
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create database tables
+    await create_db_and_tables()
+    print("Database tables created successfully!")
+    yield
+
 
 app = FastAPI(
     title="FastAPI Practice API",
     description="FastAPI practice project with structure",
     version="1.0.0",
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # Register global exception handlers
