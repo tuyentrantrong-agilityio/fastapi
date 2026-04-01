@@ -1,6 +1,6 @@
 """Task service - handles task business logic."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, Dict, Any
 import math
 
@@ -191,7 +191,7 @@ async def update_task_service(
         setattr(task, key, value)
 
     # Update timestamp and persist changes
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now()
     session.add(task)
     await session.commit()
     await session.refresh(task)

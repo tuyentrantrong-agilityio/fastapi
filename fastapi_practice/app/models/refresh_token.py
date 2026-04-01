@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone
+from datetime import datetime
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -17,5 +17,5 @@ class RefreshToken(SQLModel, table=True):
     )
     token_hash: str = Field(unique=True, index=True)  # SHA256 hash of actual token
     expires_at: datetime
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now)
     is_revoked: bool = Field(default=False)  # For logout

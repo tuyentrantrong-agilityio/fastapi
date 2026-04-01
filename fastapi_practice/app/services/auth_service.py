@@ -1,6 +1,6 @@
 """Auth service - handles authentication business logic."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Dict, cast
 
 from sqlmodel import select
@@ -64,8 +64,7 @@ async def login_service(
         # user cast to int, dont check condition user_data.id is None
         # user_id=cast(int, user_data.id),
         token_hash=token_hash,
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     session.add(refresh_tokens)
     await session.commit()
@@ -113,10 +112,8 @@ async def refresh_access_token_service(
     if not token_data:
         raise UnauthorizedException("Invalid or expired refresh token")
     expires_at = token_data.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
     # Check if token has expired
-    if datetime.now(timezone.utc) > expires_at:
+    if datetime.now() > expires_at:
         # Persist deleted token
         await session.delete(token_data)
         # TODO: For audit trail, mark as revoked instead of delete:
@@ -147,8 +144,7 @@ async def refresh_access_token_service(
     new_refresh_token_record = RefreshToken(
         user_id=user_id,
         token_hash=new_token_hash,
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
 
     # Revoke old refresh token and create new one in single transaction

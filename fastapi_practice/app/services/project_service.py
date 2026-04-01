@@ -1,6 +1,6 @@
 """Project service - handles project business logic."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List
 
 from sqlmodel import select
@@ -96,7 +96,7 @@ async def assign_task_to_project_service(
 
     # Assign task to project with updated timestamp
     task.project_id = project_id
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now()
     session.add(task)
     await session.commit()
     await session.refresh(task)
