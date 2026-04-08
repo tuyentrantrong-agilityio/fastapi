@@ -1,24 +1,35 @@
 """
 FastAPI BackgroundTasks vs Celery + Redis Demo
+With Caching & Rate Limiting
 
 Usage:
-  1. pip install fastapi uvicorn celery redis
+  1. pip install fastapi uvicorn celery redis slowapi
   2. redis-server (or start Redis)
   3. python demo_async.py
   4. celery -A demo_async.celery worker --loglevel=info (in another terminal)
 
-POST /register/background  - Uses FastAPI BackgroundTasks (same process)
-POST /register/celery      - Uses Celery + Redis (separate worker)
+Features:
+  POST /register/background  - BackgroundTasks (same process) + cache (5 reqs/min)
+  POST /register/celery      - Celery worker (separate process) + cache (5 reqs/min)
+  GET  /tasks/{task_id}      - Celery task status
+  GET  /users                - List all users
+  GET  /                     - Health check
 """
 
 import time
+import json
 from datetime import datetime
 from celery import Celery
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+import redis
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 users_db = []
+redis_client = redis.Redis(host="localhost", port=6379, db=1, decode_responses=True)
+limiter = Limiter(key_func=get_remote_address)
 
 celery_app = Celery(
     __name__, broker="redis://localhost:6379/0", backend="redis://localhost:6379/0"
@@ -100,33 +111,49 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BackgroundTasks vs Celery Demo", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(429, lambda r, e: {"error": "Rate limit exceeded"})
 
 
+@limiter.limit("5/minute")
 @app.post("/register/background")
 def register_with_background(
     request: UserRegisterRequest, background_tasks: BackgroundTasks
 ):
-    """Register with BackgroundTasks - same process"""
+    """Register with BackgroundTasks - same process (5 requests/minute)"""
+    cached = redis_client.get(f"user:{request.email}")
+    if cached:
+        print(f"[CACHE] Found user {request.email} in Redis")
+        return json.loads(cached)
+
     print(f"[API] POST /register/background for {request.email}")
     background_tasks.add_task(send_email_background, request.email)
     print(f"[API] Response sent immediately\n")
 
-    return {
+    response = {
         "status": "success",
         "message": f"Request received for {request.email}",
         "method": "background_tasks",
         "note": "Task runs in same process",
     }
+    redis_client.setex(f"user:{request.email}", 300, json.dumps(response))
+    return response
 
 
+@limiter.limit("5/minute")
 @app.post("/register/celery")
 def register_with_celery(request: UserRegisterRequest):
-    """Register with Celery - separate worker process"""
+    """Register with Celery - separate worker process (5 requests/minute)"""
+    cached = redis_client.get(f"user:{request.email}")
+    if cached:
+        print(f"[CACHE] Found user {request.email} in Redis")
+        return json.loads(cached)
+
     print(f"[API] POST /register/celery for {request.email}")
     task = send_email_celery.delay(request.email)
     print(f"[API] Task queued with ID: {task.id}\n")
 
-    return {
+    response = {
         "status": "accepted",
         "message": f"Request received for {request.email}",
         "method": "celery",
@@ -134,6 +161,8 @@ def register_with_celery(request: UserRegisterRequest):
         "note": "Task runs in separate worker process",
         "check_status": f"GET /tasks/{task.id}",
     }
+    redis_client.setex(f"user:{request.email}", 300, json.dumps(response))
+    return response
 
 
 @app.get("/tasks/{task_id}")
