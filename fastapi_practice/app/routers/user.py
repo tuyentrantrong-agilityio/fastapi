@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from ..services.auth_service import (
     login_service,
     refresh_access_token_service,
 )
+from ..tasks.email_tasks import send_welcome_email_task
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -60,7 +61,9 @@ router = APIRouter(prefix="/users", tags=["users"])
     },
 )
 async def register(
-    user: UserCreate, session: AsyncSession = Depends(get_async_session)
+    user: UserCreate,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_async_session),
 ):
     """
     Register a new user.
@@ -70,7 +73,12 @@ async def register(
 
     Returns: User ID and email
     """
-    return await create_user_service(session, user)
+    new_user = await create_user_service(session, user)
+    # Send email in response, not blocking
+    background_tasks.add_task(
+        send_welcome_email_task, email=new_user.email, user_name=new_user.email
+    )
+    return new_user
 
 
 @router.post("/login", response_model=Token)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, Query
+from fastapi import APIRouter, status, Depends, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from ..services.task_service import (
     update_task_service,
     delete_task_service,
 )
+from ..tasks.email_tasks import send_task_assigned_email_task
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 @router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     task: TaskCreate,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
     session: AsyncSession = Depends(get_async_session),
 ):
@@ -40,7 +42,17 @@ async def create_task(
     Returns:
         Created task with id, user_id, timestamps, etc.
     """
-    return await create_task_service(session, task, current_user.id)
+    new_task = await create_task_service(session, task, current_user.id)
+    # Send email notification
+    background_tasks.add_task(
+        send_task_assigned_email_task,
+        email=current_user.email,
+        user_name=current_user.email.split("@")[0],
+        task_title=new_task.title,
+        task_id=new_task.id if new_task.id is not None else 0,
+        assigned_by="You",
+    )
+    return new_task
 
 
 @router.get("/", response_model=Dict[str, Any])
