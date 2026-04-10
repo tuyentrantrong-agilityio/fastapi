@@ -87,8 +87,8 @@ class EmailService:
             part_html = MIMEText(html_content, "html")
             message.attach(part_html)
 
-            # Send via SMTP
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            # Send via SMTP (with 10s timeout to avoid hanging)
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
                 server.starttls()  # Use TLS encryption
                 server.login(self.smtp_user, self.smtp_password)
                 server.sendmail(self.from_email, to, message.as_string())
