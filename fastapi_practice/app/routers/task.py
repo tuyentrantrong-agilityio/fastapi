@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, status, Depends, Query
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,12 +24,11 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 @router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     task: TaskCreate,
-    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Create a new task for current user.
+    Create a new task for current user and send assignment email via Celery.
 
     Requires:
         - Valid JWT token in Authorization header (Bearer token)
@@ -43,14 +42,14 @@ async def create_task(
         Created task with id, user_id, timestamps, etc.
     """
     new_task = await create_task_service(session, task, current_user.id)
-    # Send email notification
-    background_tasks.add_task(
-        send_task_assigned_email_task,
+    
+    # Queue email task via Celery
+    send_task_assigned_email_task.delay(
         email=current_user.email,
         user_name=current_user.email.split("@")[0],
         task_title=new_task.title,
         task_id=new_task.id if new_task.id is not None else 0,
-        assigned_by="You",
+        assigned_by="You"
     )
     return new_task
 
