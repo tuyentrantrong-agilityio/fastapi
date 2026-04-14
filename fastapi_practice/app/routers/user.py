@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, BackgroundTasks
+from fastapi import APIRouter, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,11 +62,10 @@ router = APIRouter(prefix="/users", tags=["users"])
 )
 async def register(
     user: UserCreate,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Register a new user.
+    Register a new user and send welcome email via Celery.
 
     - **email**: Valid email address (must be unique)
     - **password**: At least 8 characters long
@@ -74,10 +73,8 @@ async def register(
     Returns: User ID and email
     """
     new_user = await create_user_service(session, user)
-    # Send email in response, not blocking
-    background_tasks.add_task(
-        send_welcome_email_task, email=new_user.email, user_name=new_user.email
-    )
+    # Queue email task via Celery (returns immediately)
+    send_welcome_email_task.delay(email=new_user.email, user_name=new_user.email)
     return new_user
 
 
@@ -114,7 +111,7 @@ async def refresh_access_token(
     Flow:
     1. Client sends plain text refresh token
     2. Server hashes it and looks up in database
-    3. If valid and not expired → generate new tokens
+    3. If valid and not expired -> generate new tokens
 
     - **refresh_token**: Valid refresh token from login
 

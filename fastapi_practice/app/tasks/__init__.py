@@ -16,9 +16,13 @@ from .email_tasks import (
     send_password_reset_email_task,
     send_task_assigned_email_task,
 )
+from .task_tasks import (
+    process_task_async,
+)
 
 __all__ = [
     "send_welcome_email_task",
     "send_password_reset_email_task",
     "send_task_assigned_email_task",
+    "process_task_async",
 ]
