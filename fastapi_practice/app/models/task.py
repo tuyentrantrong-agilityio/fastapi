@@ -15,6 +15,6 @@ class Task(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     user_id: int = Field(foreign_key="user.id")
-    user: User = Relationship(back_populates="tasks")
+    user: "User" = Relationship(back_populates="tasks")
     project_id: Optional[int] = Field(default=None, foreign_key="project.id")
     project: Optional["Project"] = Relationship(back_populates="tasks")
