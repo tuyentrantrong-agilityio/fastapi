@@ -24,11 +24,25 @@ class Settings(BaseSettings):
 
     # Email Dispatcher (Phase 2: Celery migration)
     # Options: "background_tasks" (Phase 1) or "celery" (Phase 2)
-    EMAIL_DISPATCHER: str = "background_tasks"
+    EMAIL_DISPATCHER: str = "celery"
 
-    # Redis (Phase 2: Celery + Redis)
-    # Format: redis://user:password@host:port/db
+    # Redis & Celery Configuration (Phase 2)
     REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+
+    # Test Mode (Development only)
+    # When TEST_MODE=True:
+    #   - Test endpoints (/test/*) are ENABLED
+    #   - Celery tasks run EAGERLY (synchronously, no Redis needed)
+    #   - Ideal for learning/testing Celery logic locally
+    # When TEST_MODE=False:
+    #   - Test endpoints are DISABLED
+    #   - Celery connects to Redis (production-like async)
+    #   - Need to run: Redis server + Celery worker
+    TEST_MODE: bool = False
+    FAKE_EMAIL_FAILURE: bool = False
+    FAKE_FAILURE_RATE: float = 0.5
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
