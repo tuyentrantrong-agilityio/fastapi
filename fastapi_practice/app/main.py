@@ -1,36 +1,30 @@
-from contextlib import asynccontextmanager
+﻿from contextlib import asynccontextmanager
 import logging
+import os
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 from .core.config import settings
 from .core.handlers import register_exception_handlers
+from .core.logging_config import setup_json_logging
 from .db.init_db import create_db_and_tables
-from .routers import user, task, project
+from .routers import user, task, project, websocket
+from .middleware.logging_middleware import LoggingMiddleware
+from .tasks.celery_app import celery_app
 
-# ============ Configure logging (optimized) ============
-logging.basicConfig(
-    level=logging.INFO if settings.DEBUG else logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Setup logging FIRST
+setup_json_logging(use_json=settings.DEBUG is False)
 
-# Silence overly verbose loggers
-logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
-logging.getLogger("asyncpg").setLevel(logging.WARNING)
-logging.getLogger("celery.utils").setLevel(logging.WARNING)  # Suppress Celery internal logs
-logging.getLogger("celery.app.trace").setLevel(logging.WARNING)  # Suppress trace logs
-logging.getLogger("kombu").setLevel(logging.ERROR)  # Suppress kombu connection warnings
-logging.getLogger("asyncio").setLevel(logging.WARNING)  # Suppress asyncio selector logs
-
-# ============ NEW: Import Celery app (must be before creating FastAPI app) ============
-from .tasks.celery_app import celery_app  # noqa
-
+logger = logging.getLogger(__name__)
+logger.info("🚀 FastAPI application initialized")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Create database tables
     await create_db_and_tables()
-    print("Database tables created successfully!")
+    logger.info("Database tables created successfully!")
     yield
-
 
 app = FastAPI(
     title="FastAPI Practice API",
@@ -40,6 +34,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ============ Logging Middleware (MUST BE FIRST) ============
+app.add_middleware(LoggingMiddleware)
+
+# ============ CORS Configuration ============
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register global exception handlers
 register_exception_handlers(app)
 
@@ -47,13 +53,22 @@ register_exception_handlers(app)
 app.include_router(user.router)
 app.include_router(task.router)
 app.include_router(project.router)
+app.include_router(websocket.router)
 
-# ============ NEW: Include test routes (only when TEST_MODE=True) ============
+# ============ Serve task processing demo HTML ============
+@app.get("/task-demo")
+async def get_task_demo():
+    """Serve HTML client for task processing demo"""
+    demo_file = Path(__file__).parent.parent / "templates" / "task_demo.html"   
+    if demo_file.exists():
+        return FileResponse(demo_file, media_type="text/html")
+    return {"error": "task_demo.html not found"}
+
+# ============ NEW: Include test routes (only when TEST_MODE=True) ============ 
 if settings.TEST_MODE:
     from .api.test_routes import router as test_router
     app.include_router(test_router)
-    print("[STARTUP] Test routes registered (TEST_MODE=True)")
-
+    logger.info("[STARTUP] Test routes registered (TEST_MODE=True)")
 
 @app.get("/")
 async def root():
@@ -62,11 +77,9 @@ async def root():
         "debug": settings.DEBUG,
         "test_mode": settings.TEST_MODE,
         "docs": "/docs",
-        "celery_status": "Check /test/status (if TEST_MODE=True)"
+        "celery_status": "Check /test/status (if TEST_MODE=True)",
     }
-
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
