@@ -160,9 +160,9 @@ async def get_all_tasks(
         user_id=current_user.id,
         status=filter_params.status,
         search=filter_params.search,
-        page=filter_params.page
+        page=filter_params.page,
     )
-    
+
     # Try to get from cache first
     cached_result = await cache.get(cache_key)
     if cached_result:
@@ -170,11 +170,11 @@ async def get_all_tasks(
         response.headers["X-Cache"] = "HIT"
         response.headers["X-Cache-Key"] = cache_key
         return cached_result
-    
+
     logger.info(f"Cache MISS for user {current_user.id} tasks list, fetching from DB")
     response.headers["X-Cache"] = "MISS"
     response.headers["X-Cache-Key"] = cache_key
-    
+
     # Fetch from database
     result = await get_user_tasks_filtered_service(
         session=session,
@@ -190,11 +190,11 @@ async def get_all_tasks(
 
     # SQLAlchemy/SQLModel objects and datetimes must be JSON-compatible for Redis cache.
     result_json = jsonable_encoder(result)
-    
+
     # Store in cache with TTL
     cache_saved = await cache.set(cache_key, result_json, ttl=TASK_LIST_CACHE_TTL)
     response.headers["X-Cache-Store"] = "OK" if cache_saved else "ERROR"
-    
+
     return result_json
 
 
@@ -254,11 +254,11 @@ async def update_task(
         403 Forbidden: If user is not the task owner
     """
     result = await update_task_service(session, task_id, task_update)
-    
+
     # Invalidate cache for this user's task list
     await cache.delete_pattern(f"tasks:u{current_user.id}:*")
     logger.info(f"Cache invalidated for user {current_user.id} after task update")
-    
+
     # [KEY] NEW: Broadcast to all subscribed WebSocket clients
     try:
         await manager.broadcast_to_subscribers(
@@ -269,16 +269,20 @@ async def update_task(
                 "status": result.status,
                 "title": result.title,
                 "description": result.description,
-                "updated_at": result.updated_at.isoformat() if result.updated_at else None,
-                "user_id": result.user_id
-            }
+                "updated_at": result.updated_at.isoformat()
+                if result.updated_at
+                else None,
+                "user_id": result.user_id,
+            },
         )
         logger.info(f"WebSocket notification sent for task {task_id} update")
     except Exception as e:
         # WebSocket broadcast failure should NOT crash the update endpoint
         # Task is already updated in DB, just real-time notification failed
-        logger.error(f"WebSocket broadcast failed for task {task_id}: {e}", exc_info=True)
-    
+        logger.error(
+            f"WebSocket broadcast failed for task {task_id}: {e}", exc_info=True
+        )
+
     return result
 
 
@@ -311,11 +315,11 @@ async def delete_task(
         403 Forbidden: If user is not the task owner
     """
     await delete_task_service(session, task_id)
-    
+
     # Invalidate cache for this user's task list
     await cache.delete_pattern(f"tasks:u{current_user.id}:*")
     logger.info(f"Cache invalidated for user {current_user.id} after task deletion")
-    
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"message": f"Task {task_id} deleted"},
@@ -367,44 +371,10 @@ async def process_task(
     """
     # Trigger Celery task (returns immediately with task ID)
     celery_task = process_task_async.delay(task_id)
-    
+
     return {
         "celery_task_id": celery_task.id,
         "status": "accepted",
         "message": "Task processing started, check /tasks/{}/status".format(task_id),
-        "task_id": task_id
-    }
-
-
-@router.get("/{task_id}/status")
-async def get_task_status(
-    task_id: int,
-    task: dict = Depends(get_owned_task_or_error),
-):
-    """
-    Check task processing status and current task status in database.
-
-    Use this endpoint to poll task progress after triggering POST /tasks/{task_id}/process
-
-    Returns:
-        {
-            "task_id": 1,
-            "task_status": "in_progress",  # Database: todo, in_progress, done
-            "celery_status": "PROGRESS"     # Celery: PENDING, PROGRESS, SUCCESS, FAILURE
-        }
-
-    Example polling flow:
-        1. POST /tasks/1/process
-        2. Loop: GET /tasks/1/status until task_status == "done"
-        3. Render final result to user
-
-    Returns:
-        Task current status from database
-    """
-    # Convert SQLModel to dict for response
-    task_dict = {
         "task_id": task_id,
-        "task_status": task.status if task else "unknown",
-        "message": "Check this endpoint until task_status becomes 'done'"
     }
-    return task_dict
