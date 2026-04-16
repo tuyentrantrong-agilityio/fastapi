@@ -11,6 +11,8 @@ import logging
 import random
 import asyncio
 import concurrent.futures
+import time
+import os
 from .celery_app import celery_app
 from ..services.email_service import email_service
 from ..core.config import settings
@@ -18,51 +20,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 
-# ============ Task Lifecycle Logging ============
-def log_task_received(task_name: str, task_id: str, email: str):
-    """Log: Task received from queue"""
-    print(f"[RECEIVE] [{task_name}] RECEIVED from queue")
-    print(f"   └─ Task ID: {task_id}")
-    print(f"   └─ Email: {email}")
-    logger.info(f"[RECEIVE] Task received: {task_name} (ID: {task_id})")
-
-
-def log_task_started(task_name: str, retry_count: int = 0):
-    """Log: Task execution started"""
-    if retry_count == 0:
-        print(f"[PROCESS]  [{task_name}] PROCESSING...")
-    else:
-        print(f"[RETRY] [{task_name}] RETRY #{retry_count + 1} of 3...")
-    logger.info(f"[PROCESS]  Task started: {task_name} (Retry: {retry_count})")
-
-
-def log_task_success(email: str):
-    """Log: Task completed successfully"""
-    logger.info(f"[OK] EMAIL SENT to {email}")
-    logger.info(f"[OK] Task completed: Email sent")
-
-
-def log_task_failed(email: str, error: str, retry_count: int):
-    """Log: Task failed (will retry or fail permanently)"""
-    if retry_count < 2:
-        logger.error(f"[NO] FAILED: {email}")
-        print(f"   └─ Error: {error}")
-        print(f"   └─ [RETRY] Retrying in 5s... (Attempt {retry_count + 2}/3)")
-        logger.warning(f"[NO] Task failed, retry {retry_count + 2}/3: {error}")
-    else:
-        print(f"[FAILURE] FAILED (NO MORE RETRIES): {email}")
-        print(f"   └─ Error: {error}")
-        logger.error(f"[FAILURE] Task failed permanently: {error}")
-
-
-def log_queue_status(action: str, count: int = None):
-    """Log: Queue status"""
-    if action == "enqueued":
-        print(f"[ENQUEUE] ENQUEUED {count} task(s) to queue")
-        logger.info(f"[ENQUEUE] Task(s) enqueued: {count}")
-    elif action == "processing":
-        print(f"[PROCESS]  PROCESSING {count} active task(s)...")
-        logger.info(f"[PROCESS]  Processing: {count} tasks")
+# Production-ready logging (no helper functions needed)
 
 
 def run_async(coro):
@@ -285,21 +243,28 @@ FastAPI Practice Team
 )
 def send_welcome_email_task(self, email: str, user_name: str = "User"):
     """Send welcome email after user registration - Celery task."""
+    start_time = time.time()
     task_id = self.request.id
     retry_count = self.request.retries
 
-    # Log: Task received
-    log_task_received("send_welcome_email_task", task_id, email)
-    log_task_started("send_welcome_email_task", retry_count)
+    logger.info(f"[START] id={task_id} email={email}")
 
     try:
+        # Simulate workload for 3-5 seconds to observe concurrency
+        sleep_time = 3 if retry_count == 0 else 2
+        time.sleep(sleep_time)
+
         result = run_async(
             _send_welcome_email(email, user_name, retry_count=retry_count)
         )
-        log_task_success(email)
+
+        duration = time.time() - start_time
+        logger.info(f"[SUCCESS] id={task_id} email={email} duration={duration:.2f}s")
         return result
     except Exception as exc:
-        log_task_failed(email, str(exc), retry_count)
+        duration = time.time() - start_time
+        logger.error(f"[ERROR] id={task_id} email={email} error={str(exc)}")
+        logger.warning(f"[RETRY] id={task_id} retry={retry_count + 1}")
         raise self.retry(exc=exc, countdown=5)
 
 
@@ -341,8 +306,17 @@ def send_task_assigned_email_task(
     assigned_by: str = "System",
 ):
     """Send task assignment notification email."""
-    logger.info(f"[CELERY] ===== Task send_task_assigned_email_task QUEUED =====")
+    start_time = time.time()
+    celery_task_id = self.request.id
+    retry_count = self.request.retries
+
+    logger.info(f"[START] id={celery_task_id} email={email}")
+
     try:
+        # Simulate workload for 3-5 seconds
+        sleep_time = 3 if retry_count == 0 else 2
+        time.sleep(sleep_time)
+
         result = run_async(
             _send_task_assigned_email(
                 email,
@@ -350,16 +324,17 @@ def send_task_assigned_email_task(
                 task_title,
                 task_id,
                 assigned_by,
-                retry_count=self.request.retries,
+                retry_count=retry_count,
             )
         )
+
+        duration = time.time() - start_time
         logger.info(
-            f"[CELERY] ===== Task send_task_assigned_email_task COMPLETED ====="
+            f"[SUCCESS] id={celery_task_id} email={email} duration={duration:.2f}s"
         )
         return result
     except Exception as exc:
-        logger.error(f"[CELERY-ERROR] Task failed: {str(exc)}")
-        logger.info(
-            f"[CELERY] ===== Retrying (attempt #{self.request.retries + 1}/3) ====="
-        )
+        duration = time.time() - start_time
+        logger.error(f"[ERROR] id={celery_task_id} email={email} error={str(exc)}")
+        logger.warning(f"[RETRY] id={celery_task_id} retry={retry_count + 1}")
         raise self.retry(exc=exc, countdown=5)
