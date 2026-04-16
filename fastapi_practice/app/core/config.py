@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = (
         "postgresql+asyncpg://postgres:tuyen01233164210@localhost:5432/appdb"
     )
+    POSTGRES_PASSWORD: Optional[str] = None  # Docker-only, not used by app
 
     # Email Configuration (Phase 1: BackgroundTasks)
     SMTP_HOST: str = "smtp.gmail.com"  # or your SMTP provider
@@ -44,7 +45,11 @@ class Settings(BaseSettings):
     FAKE_EMAIL_FAILURE: bool = False
     FAKE_FAILURE_RATE: float = 0.5
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # Allow extra fields from .env
+    )
 
 
 settings = Settings()
