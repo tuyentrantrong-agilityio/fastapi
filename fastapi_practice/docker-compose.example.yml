@@ -1,0 +1,116 @@
+# Docker Compose Example - Copy to docker-compose.yml and fill in your secrets
+#
+# IMPORTANT:
+# 1. Copy this file to docker-compose.yml
+# 2. Replace placeholders with your actual values
+# 3. DO NOT commit docker-compose.yml to git!
+# 4. Keep this example.yml in git for reference
+
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: fastapi_api
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ALGORITHM=HS256
+      - DEBUG=True
+      - TEST_MODE=True
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres123@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASSWORD=your-app-password
+      - SMTP_FROM_EMAIL=noreply@fastapi-practice.com
+      - EMAIL_DISPATCHER=celery
+      - FAKE_EMAIL_FAILURE=false
+      - FAKE_FAILURE_RATE=0.5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app_network
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: fastapi_postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+      - POSTGRES_DB=appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: fastapi_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: fastapi_celery_worker
+    command: celery -A app.tasks.celery_app worker -l info -P threads --concurrency=4
+    environment:
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ALGORITHM=HS256
+      - DEBUG=True
+      - TEST_MODE=True
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres123@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASSWORD=your-app-password
+      - SMTP_FROM_EMAIL=noreply@fastapi-practice.com
+      - EMAIL_DISPATCHER=celery
+      - FAKE_EMAIL_FAILURE=false
+      - FAKE_FAILURE_RATE=0.5
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app_network
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
