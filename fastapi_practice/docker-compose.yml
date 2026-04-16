@@ -7,10 +7,24 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres123@postgres:5432/appdb
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ALGORITHM=HS256
+      - DEBUG=True
+      - TEST_MODE=True
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/appdb
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-noreply@fastapi-practice.com}
+      - EMAIL_DISPATCHER=celery
+      - FAKE_EMAIL_FAILURE=false
+      - FAKE_FAILURE_RATE=0.5
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,7 +42,7 @@ services:
     container_name: fastapi_postgres
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres123
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres123}
       - POSTGRES_DB=appdb
     ports:
       - "5432:5432"
@@ -53,6 +67,38 @@ services:
     networks:
       - app_network
     restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: fastapi_celery_worker
+    command: celery -A app.tasks.celery_app worker -l info -P threads --concurrency=4
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ALGORITHM=HS256
+      - DEBUG=True
+      - TEST_MODE=True
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-noreply@fastapi-practice.com}
+      - EMAIL_DISPATCHER=celery
+      - FAKE_EMAIL_FAILURE=false
+      - FAKE_FAILURE_RATE=0.5
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app_network
+    restart: unless-stopped
+    volumes:
+      - ./app:/app/app
 
 networks:
   app_network:
