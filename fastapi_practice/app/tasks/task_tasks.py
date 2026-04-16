@@ -9,6 +9,7 @@ import logging
 import asyncio
 import random
 import time
+import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
@@ -35,7 +36,7 @@ celery_async_session = sessionmaker(
 
 async def _update_task_status(task_id: int, status: str) -> dict:
     """Helper: Update task status in database (async)
-    
+
     Uses a dedicated database session to avoid conflicts with FastAPI's session.
     """
     try:
@@ -44,22 +45,22 @@ async def _update_task_status(task_id: int, status: str) -> dict:
             stmt = select(Task).where(Task.id == task_id)
             result = await session.execute(stmt)
             task = result.scalars().first()
-            
+
             if not task:
                 logger.warning(f"Task {task_id} not found")
                 return {"status": "error", "message": f"Task {task_id} not found"}
-            
+
             # Update status
             task.status = status
             session.add(task)
             await session.commit()
-            
+
             logger.info(f"[OK] Task {task_id} status updated to: {status}")
             return {
                 "status": "success",
                 "task_id": task_id,
                 "task_status": status,
-                "title": task.title
+                "title": task.title,
             }
     except Exception as exc:
         logger.error(f"Failed to update task {task_id}: {exc}")
@@ -68,7 +69,7 @@ async def _update_task_status(task_id: int, status: str) -> dict:
 
 def run_async(coro):
     """Helper: Run async function from sync Celery task
-    
+
     In TEST_MODE, Celery tasks run eagerly in the same process as FastAPI.
     Since FastAPI already has a running event loop, we need to:
     1. Detect if there's a running loop
@@ -76,7 +77,7 @@ def run_async(coro):
     3. If no, create a new loop in the current thread
     """
     import concurrent.futures
-    
+
     try:
         # Check if there's already a running event loop
         loop = asyncio.get_running_loop()
@@ -94,46 +95,55 @@ def run_async(coro):
             loop.close()
 
 
-@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=5)
+@celery_app.task(
+    bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=5
+)
 def process_task_async(self, task_id: int):
     """
     Celery task: Process task asynchronously.
-    
+
     Simulates long-running operation:
     1. todo -> in_progress (immediate)
     2. Wait 5-10 seconds (simulate processing)
     3. in_progress -> done
-    
+
+    Logs execution details to verify concurrency:
+    - [TASK START] with pid, celery task_id, timestamp
+    - [TASK END] with pid, celery task_id, duration
+
     Args:
         task_id: Task ID to process
-    
+
     Returns:
         Task result with final status
     """
+    start_time = time.time()
     task_cid = self.request.id
     retry_count = self.request.retries
-    
-    logger.info(f"[RECEIVE] [process_task_async] Task received (Celery ID: {task_cid})")
-    
+
+    logger.info(f"[START] id={task_cid} task_id={task_id}")
+
     try:
         # Step 1: Update to in_progress
-        logger.info(f"[PROCESS]  [Task {task_id}] Updating status to 'in_progress'...")
         result = run_async(_update_task_status(task_id, "in_progress"))
         if result["status"] != "success":
             raise Exception(result.get("message", "Failed to update status"))
-        
+
         # Step 2: Simulate processing (random delay 5-10s)
         delay = random.randint(5, 10)
-        logger.info(f"⏳ [Task {task_id}] Processing... (waiting {delay}s)")
         time.sleep(delay)
-        
+
         # Step 3: Update to done
-        logger.info(f"[OK] [Task {task_id}] Processing complete, updating status to 'done'...")
         result = run_async(_update_task_status(task_id, "done"))
-        
-        logger.info(f"[OK] [process_task_async] Task completed successfully")
+
+        duration = time.time() - start_time
+        logger.info(
+            f"[SUCCESS] id={task_cid} task_id={task_id} duration={duration:.2f}s"
+        )
         return result
-        
+
     except Exception as exc:
-        logger.error(f"[NO] [Task {task_id}] Error: {str(exc)} (Retry {retry_count + 1}/2)")
+        duration = time.time() - start_time
+        logger.error(f"[ERROR] id={task_cid} task_id={task_id} error={str(exc)}")
+        logger.warning(f"[RETRY] id={task_cid} retry={retry_count + 1}")
         raise self.retry(exc=exc, countdown=5)
