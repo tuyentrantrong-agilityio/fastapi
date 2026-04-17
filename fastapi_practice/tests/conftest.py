@@ -6,6 +6,8 @@ This module provides fixtures for:
 - Test database
 - Test user creation and authentication
 - Async database session for unit testing
+- Celery + Redis mocking for background tasks
+- Test markers (unit, integration)
 """
 
 import pytest
@@ -14,6 +16,7 @@ from fastapi.testclient import TestClient
 from datetime import timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import insert
+from unittest.mock import AsyncMock, MagicMock
 
 from app.main import app
 from app.core.security import create_access_token
@@ -23,39 +26,51 @@ from app.db.session import get_async_session
 from app.models.user import User
 
 
-@pytest_asyncio.fixture
-async def async_engine():
-    """Create an async engine for testing (function-scoped per test).
-
-    Uses SQLite file (test_app.db) instead of in-memory for better
-    test isolation and persistence. Database is reset between tests.
-    """
-    import os
-
-    # Use SQLite file in project root
-    db_file = "test_app.db"
-    db_url = f"sqlite+aiosqlite:///./{db_file}"
-
-    engine = create_async_engine(
-        db_url,
-        echo=False,
-        future=True,
+def pytest_configure(config):
+    """Register custom pytest markers for test classification."""
+    config.addinivalue_line("markers", "unit: mark test as a unit test (mocked, fast)")
+    config.addinivalue_line(
+        "markers", "integration: mark test as an integration test (real DB, slower)"
     )
 
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
 
-    yield engine
+@pytest.fixture(autouse=True)
+def mock_celery_tasks(request, monkeypatch):
+    """Auto-use fixture to mock all Celery tasks to prevent Redis connection attempts.
 
-    # Cleanup: drop all tables and close engine
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
+    Skips mocking for unit tests (which need to test real task attributes).
+    Only mocks for integration tests.
+    """
+    # Skip mocking for unit tests - they need real Celery task objects
+    if "unit" in [marker.name for marker in request.node.iter_markers()]:
+        return
 
-    await engine.dispose()
+    from unittest.mock import MagicMock
+    from app.tasks import email_tasks, task_tasks
 
-    # Delete test database file
-    if os.path.exists(db_file):
-        os.remove(db_file)
+    # Create mocks that return immediately (Mock objects are callable and return another Mock)
+    mock_send_welcome = MagicMock()
+    mock_send_task_assigned = MagicMock()
+    mock_process_task = MagicMock()
+
+    # Patch the task objects in their modules
+    monkeypatch.setattr(email_tasks, "send_welcome_email_task", mock_send_welcome)
+    monkeypatch.setattr(
+        email_tasks, "send_task_assigned_email_task", mock_send_task_assigned
+    )
+    monkeypatch.setattr(task_tasks, "process_task_async", mock_process_task)
+
+
+@pytest.fixture
+def async_engine():
+    """Create an async engine for testing with in-memory SQLite."""
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        future=True,
+        connect_args={"check_same_thread": False},
+    )
+    return engine
 
 
 @pytest_asyncio.fixture
@@ -63,13 +78,16 @@ async def async_session(async_engine):
     """
     Provide an async database session for unit testing.
 
-    Creates an in-memory SQLite database, initializes tables,
-    yields the session, then cleans up.
+    Creates tables, yields the session, then cleans up.
 
     Usage:
         async def test_something(async_session: AsyncSession):
             ...
     """
+    # Create tables
+    async with async_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
     # Create async session factory
     async_session_maker = async_sessionmaker(
         async_engine,
@@ -82,6 +100,12 @@ async def async_session(async_engine):
     async with async_session_maker() as session:
         yield session
 
+    # Cleanup: drop all tables
+    async with async_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+
+    await async_engine.dispose()
+
 
 @pytest.fixture
 def client(async_engine):
@@ -92,6 +116,19 @@ def client(async_engine):
         TestClient: FastAPI test client for making HTTP requests
     """
 
+    # Create tables synchronously
+    import asyncio
+
+    async def create_tables():
+        async with async_engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(create_tables())
+    loop.close()
+
+    # Setup dependency override
     def override_get_async_session_factory():
         async def override_get_async_session():
             async_session_maker = async_sessionmaker(
@@ -106,8 +143,8 @@ def client(async_engine):
         return override_get_async_session
 
     app.dependency_overrides[get_async_session] = override_get_async_session_factory()
-    client = TestClient(app)
-    yield client
+    test_client = TestClient(app)
+    yield test_client
     app.dependency_overrides.clear()
 
 
@@ -313,3 +350,107 @@ def auth_headers_user_2(user_token_2):
         dict: HTTP headers with Authorization for user 2
     """
     return {"Authorization": f"Bearer {user_token_2}"}
+
+
+# ========== CELERY + REDIS MOCKING ==========
+
+
+@pytest.fixture
+def celery_config(monkeypatch):
+    """Configure Celery for testing with eager mode.
+
+    In eager mode, tasks are executed synchronously (not queued),
+    making it easy to test task logic without a running worker.
+    """
+    monkeypatch.setenv("CELERY_ALWAYS_EAGER", "True")
+    monkeypatch.setenv("CELERY_EAGER_PROPAGATES_EXCEPTIONS", "True")
+    return {
+        "task_always_eager": True,
+        "task_eager_propagates": True,
+    }
+
+
+@pytest.fixture
+def mock_redis_client(mocker):
+    """Provide a mocked Redis client for testing.
+
+    Uses AsyncMock (not Mock) to properly handle async operations.
+    Patch location: where redis_client is USED, not where it's defined.
+
+    Example usage in test:
+        mock_redis = mock_redis_client
+        r1 = client.get("/tasks/1")
+        assert r1.headers.get("X-Cache") in ["MISS", None]
+    """
+    mock = AsyncMock()
+    mock.get = AsyncMock(return_value=None)
+    mock.set = AsyncMock(return_value=True)
+    mock.delete = AsyncMock(return_value=1)
+    mock.exists = AsyncMock(return_value=0)
+    mock.ttl = AsyncMock(return_value=-2)
+
+    return mocker.patch("app.services.cache.redis_client", mock)
+
+
+@pytest.fixture
+def invalid_auth_headers():
+    """Provide invalid Authorization header for auth failure testing.
+
+    Returns:
+        dict: HTTP headers with invalid Bearer token
+    """
+    return {"Authorization": "Bearer invalid_token_xyz"}
+
+
+# ========== TASK FIXTURES FOR TESTING ==========
+
+
+@pytest_asyncio.fixture
+async def test_project(async_session, test_user):
+    """Create a test project for the test user.
+
+    Args:
+        async_session: Async database session
+        test_user: Test user fixture
+
+    Returns:
+        Project: Created project object
+    """
+    from app.models.project import Project
+
+    project = Project(
+        name="Test Project",
+        description="A test project",
+        user_id=test_user.id,
+    )
+    async_session.add(project)
+    await async_session.commit()
+    await async_session.refresh(project)
+    return project
+
+
+@pytest_asyncio.fixture
+async def test_task(async_session, test_user, test_project):
+    """Create a test task for the test user.
+
+    Args:
+        async_session: Async database session
+        test_user: Test user fixture
+        test_project: Test project fixture
+
+    Returns:
+        Task: Created task object
+    """
+    from app.models.task import Task
+
+    task = Task(
+        title="Test Task",
+        description="A test task",
+        status="todo",
+        user_id=test_user.id,
+        project_id=test_project.id,
+    )
+    async_session.add(task)
+    await async_session.commit()
+    await async_session.refresh(task)
+    return task

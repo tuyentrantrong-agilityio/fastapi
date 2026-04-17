@@ -5,24 +5,31 @@ A comprehensive FastAPI learning project demonstrating user authentication, task
 ## Overview
 
 This project builds a production-like task management API with:
-- User authentication and authorization with JWT tokens and refresh token rotation
-- Secure password hashing using Argon2id (OWASP recommended)
-- Full CRUD operations for tasks with filtering, search, and pagination
-- Role-based access control (user vs admin)
-- Task ownership enforcement (users can only access their own tasks)
-- Project management with task assignments
-- **134 comprehensive tests** (52 unit tests + 82 integration tests)
-- Modular architecture with clear separation of concerns
+- **Authentication & Authorization**: JWT tokens + refresh token rotation, role-based access control (user vs admin)
+- **Security**: Argon2id password hashing (OWASP recommended), ownership enforcement
+- **Task Management**: CRUD operations with advanced filtering, full-text search, and pagination
+- **Real-time Updates**: WebSocket support for live task notifications
+- **Performance**: Redis caching for task lists with intelligent cache invalidation
+- **Background Processing**: Celery workers for async email delivery and task processing
+- **API Versioning**: Layer-first architecture ready for multiple API versions (v1, v2, etc.)
+- **Database**: PostgreSQL with SQLAlchemy ORM and Alembic migrations
+- **Testing**: 134 comprehensive tests (52 unit + 82 integration), conftest fixtures
+- **Code Quality**: Type hints throughout, Pyright type checking, structured logging with JSON output
 
 ## Tech Stack
 
-- **FastAPI** 0.128.0 - Fast, modern web framework
-- **Uvicorn** - ASGI server
+- **FastAPI** 0.128.0 - Modern async web framework
+- **Uvicorn** - ASGI server for production-ready deployments
+- **SQLAlchemy** 2.0+ - Async ORM with SQLModel
+- **PostgreSQL** - Primary database (asyncpg driver)
 - **Pydantic** 2.12.5 - Data validation and settings management
-- **Argon2-cffi** - Secure password hashing
+- **Redis** - Caching layer for performance
+- **Celery** - Distributed task queue for async work
+- **Argon2-cffi** - Secure password hashing (OWASP recommended)
 - **python-jose** - JWT token generation and validation
-- **Pytest** 9.0.2 - Testing framework
-- **httpx** 0.28.1 - Async HTTP client for testing
+- **Alembic** - Database migration management
+- **Pytest** 9.0.2 - Testing framework with fixtures and mocking
+- **httpx** 0.28.1 - Async HTTP client for integration tests
 - **Python** 3.11+
 
 ## Installation
@@ -78,10 +85,13 @@ fastapi_practice/
 │   ├── core/                    # Core utilities and configuration
 │   │   ├── __init__.py
 │   │   ├── config.py            # Settings and environment variables
-│   │   ├── hashing.py           # Password hashing using Argon2id
+│   │   ├── hashing.py           # Argon2id password hashing
 │   │   ├── security.py          # JWT token generation and verification
 │   │   ├── exceptions.py        # Custom exception classes
-│   │   └── handlers.py          # Global exception handlers
+│   │   ├── handlers.py          # Global exception handlers
+│   │   ├── cache_keys.py        # Redis cache key constants
+│   │   ├── logging_config.py    # JSON logging configuration
+│   │   └── websocket_manager.py # Real-time WebSocket connection manager
 │   │
 │   ├── db/                      # Database layer
 │   │   ├── __init__.py
@@ -103,23 +113,38 @@ fastapi_practice/
 │   │   ├── project.py          # Project schemas
 │   │   └── query.py            # Query parameter schemas
 │   │
-│   ├── routers/                 # API route handlers (HTTP endpoints)
-│   │   ├── __init__.py
-│   │   ├── user.py             # /users endpoints (register, login, profile, update)
-│   │   ├── task.py             # /tasks endpoints (CRUD, filtering, pagination)
-│   │   └── project.py          # /projects endpoints (CRUD)
+│   ├── api/                     # API package (versioning-ready structure)
+│   │   ├── endpoints/           # API route handlers (HTTP endpoints)
+│   │   │   ├── __init__.py
+│   │   │   ├── user.py         # /users endpoints (register, login, profile, update)
+│   │   │   ├── task.py         # /tasks endpoints (CRUD, filtering, pagination)
+│   │   │   ├── project.py      # /projects endpoints (CRUD)
+│   │   │   └── websocket.py    # /ws endpoint (WebSocket real-time updates)
+│   │   └── __init__.py
 │   │
 │   ├── services/                # Business logic layer (SERVICE LAYER)
 │   │   ├── __init__.py
 │   │   ├── auth_service.py     # Authentication logic (login, refresh token)
 │   │   ├── user_service.py     # User CRUD business logic
 │   │   ├── task_service.py     # Task CRUD & filtering business logic
-│   │   └── project_service.py  # Project business logic & task assignment
+│   │   ├── project_service.py  # Project business logic & task assignment
+│   │   ├── cache_service.py    # Redis caching service
+│   │   └── email_service.py    # Email sending service
 │   │
-│   └── dependencies/            # FastAPI dependency injection
-│       ├── __init__.py
-│       ├── user.py             # get_current_user, get_admin_user dependencies
-│       └── task.py             # get_task_or_404 dependency
+│   ├── dependencies/            # FastAPI dependency injection
+│   │   ├── __init__.py
+│   │   ├── user.py             # get_current_user, get_admin_user dependencies
+│   │   ├── task.py             # get_owned_task_or_error dependency
+│   │   └── cache.py            # get_cache dependency
+│   │
+│   ├── middleware/              # Custom middleware
+│   │   └── logging_middleware.py # Request/response logging with JSON output
+│   │
+│   ├── tasks/                   # Celery async workers
+│   │   ├── __init__.py
+│   │   ├── celery_app.py       # Celery configuration
+│   │   ├── email_tasks.py      # Email delivery worker tasks
+│   │   └── task_tasks.py       # Long-running task processor
 │
 ├── alembic/                     # Database migrations (Alembic)
 │   ├── env.py                   # Alembic runtime configuration
@@ -158,7 +183,7 @@ fastapi_practice/
 
 ## Layered Architecture
 
-This project follows a **three-tier layered architecture** for clean code separation:
+This project follows a **three-tier layered architecture** with API versioning support for clean code separation:
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -166,38 +191,112 @@ This project follows a **three-tier layered architecture** for clean code separa
 └──────────────────┬──────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────┐
-│  Router Layer (API Endpoints)                   │
-│  ├── /users/register, /users/login              │
-│  ├── /tasks (CRUD + filtering + pagination)     │
-│  └── /projects (CRUD + task assignment)         │
-│  Responsibility: Validate input, handle HTTP    │
+│  API Endpoint Layer (api/endpoints/)            │
+│  ├── user.py: /users (register, login, profile) │
+│  ├── task.py: /tasks (CRUD, search, pagination)│
+│  ├── project.py: /projects (CRUD + assign)     │
+│  └── websocket.py: /ws (real-time updates)     │
+│  Responsibility: HTTP handling, validation      │
 └──────────────────┬──────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────┐
-│  Service Layer (Business Logic)                 │
+│  Service Layer (services/)                      │
 │  ├── auth_service: Login, token refresh         │
 │  ├── user_service: User CRUD operations         │
-│  ├── task_service: Task CRUD, filtering         │
-│  └── project_service: Project management        │
-│  Responsibility: Core business logic, rules     │
+│  ├── task_service: Task CRUD, filtering, search │
+│  ├── project_service: Project management        │
+│  ├── cache_service: Redis caching               │
+│  └── email_service: Email delivery              │
+│  Responsibility: Business logic & rules         │
 └──────────────────┬──────────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────────┐
-│  Database Layer (SQLite + Alembic)              │
+│  Database Layer (db/, models/)                  │
 │  ├── Models: User, Task, Project, RefreshToken  │
-│  ├── Session: AsyncSession for async queries    │
-│  └── Migrations: Version control via Alembic    │
-│  Responsibility: Data persistence & schema mgmt │
+│  ├── AsyncSession: Async database connection    │
+│  └── Alembic: Database version control          │
+│  Responsibility: Data persistence & migration   │
 └─────────────────────────────────────────────────┘
 ```
 
-**Data Flow Example: Creating a Task**
+**Architecture Features:**
+- **API Versioning Ready**: Structure supports easy addition of `/api/v1/`, `/api/v2/` in future
+- **Layer-First Design**: Horizontal slicing makes layer responsibilities clear
+- **Shared Infrastructure**: `core/`, `services/`, `db/` shared across all API versions
+- **Dependency Injection**: `dependencies/` for reusable request validators
+- **Real-time Support**: WebSocket manager for live task updates
+- **Caching**: Redis integration for task list caching
+- **Async Tasks**: Celery workers for email & background processing
 
-1. **HTTP Request** → `POST /tasks {"title": "Learn FastAPI"}`
-2. **Router** → Validates input with TaskCreate schema, calls service layer
-3. **Service** → `create_task_service()` → Checks user ownership, creates Task model
-4. **Database** → Inserts Task row, returns created object
-5. **Response** → Returns TaskResponse (status 201)
+## Advanced Features
+
+### 🔄 Real-time Updates with WebSocket
+
+Live task notifications for subscribed clients:
+
+```python
+# Client subscribes to task updates
+ws://localhost:8000/ws?token=<jwt_token>
+
+# Send subscription request
+{"action": "subscribe", "task_id": 1}
+
+# Receive live updates when task changes
+{
+  "event": "task_updated",
+  "task_id": 1,
+  "status": "done",
+  "title": "Learn FastAPI",
+  "updated_at": "2024-01-15T10:30:00"
+}
+```
+
+**Features:**
+- JWT authentication via query parameters
+- Ownership validation (users only see their own tasks)
+- Dynamic subscriptions (subscribe/unsubscribe at runtime)
+- Broadcast notifications on task updates
+
+### 💾 Redis Caching
+
+Intelligent caching layer for task lists with TTL and auto-invalidation:
+
+**Cache Strategy:**
+- Task list cache: 5 minutes TTL
+- Project list cache: 10 minutes TTL
+- Automatic invalidation on create/update/delete operations
+- Cache key patterns: `tasks:u{user_id}:filter={status}:page={page}`
+
+**Headers returned:**
+```
+X-Cache: HIT|MISS              # Whether data came from cache
+X-Cache-Key: tasks:u1:...      # Cache key used
+X-Cache-Store: OK|ERROR        # Whether cache store succeeded
+```
+
+### 📧 Async Email Delivery with Celery
+
+Background workers handle non-blocking email operations:
+
+**Tasks:**
+- `send_welcome_email_task` - Welcome email on user registration
+- `send_task_assigned_email_task` - Notification on task creation
+
+**Configuration:**
+- Message broker: Redis
+- Result backend: Redis
+- Worker processes: Configurable via environment
+- Auto-retry on failure with exponential backoff
+
+**Example:**
+```python
+# Email is queued and sent asynchronously
+send_task_assigned_email_task.delay(
+    email="user@example.com",
+    task_title="Learn FastAPI",
+    task_id=1
+)
+```
 
 ## API Endpoints
 
@@ -329,10 +428,10 @@ This project uses **two types of tests**:
 ### Running Tests
 
 ```bash
-# Run all tests (122 total)
+# Run all tests (134 total: 52 unit + 82 integration)
 uv run pytest tests/ -v
 
-# Run only unit tests (40 tests)
+# Run only unit tests (52 tests)
 uv run pytest tests/unit/ -v
 
 # Run only integration tests (82 tests)
@@ -358,11 +457,11 @@ uv run pytest tests/ --cov=app --cov-report=html
 
 | Component | Unit Tests | Integration Tests | Total |
 |-----------|-----------|------------------|-------|
-| **Authentication** | 8 (Login, Refresh token) | 26 (Register, Login, Profile) | 34 |
-| **User Service** | 7 (CRUD, profiles) | — | 7 |
-| **Task Service** | 13 (CRUD, filtering) | 38 (API endpoints) | 51 |
-| **Project Service** | 12 (CRUD, assignment) | 18 (API endpoints) | 30 |
-| **TOTAL** | **40** | **82** | **122** |
+| **Authentication** | 12 | 26 | 38 |
+| **Users** | 10 | 8 | 18 |
+| **Tasks** | 18 | 38 | 56 |
+| **Projects** | 12 | 10 | 22 |
+| **TOTAL** | **52** | **82** | **134** |
 
 ## Learning Curriculum & Progress
 
@@ -506,11 +605,82 @@ uv run pytest tests/unit/ -v --pdb
 
 **Problem**: Cannot run server on port 8000 (already in use)
 
-**Solution**:
-```bash
-# Run on different port
+**Solution**: Run on different port
 uv run uvicorn app.main:app --port 8001 --reload
 ```
+
+## Architecture & Design Decisions
+
+### API Endpoints Structure: Layer-First with Versioning Support
+
+**Recent Refactoring (April 2024):**
+- Moved `routers/` → `api/endpoints/` for cleaner versioning structure
+- Enables future support for multiple API versions (v1, v2, etc.)
+- Maintains clear separation between HTTP handlers and business logic
+
+**Directory Structure:**
+```
+app/
+├── api/
+│   └── endpoints/       ← HTTP endpoint handlers
+│       ├── user.py
+│       ├── task.py
+│       ├── project.py
+│       └── websocket.py
+├── services/            ← Business logic (reusable across versions)
+├── db/                  ← Database layer (shared)
+└── core/                ← Cross-cutting concerns (shared)
+```
+
+**Benefits:**
+- ✅ **Clear Responsibilities**: Each layer has single responsibility
+- ✅ **Scalability**: Easy to add `/api/v2/endpoints/` for breaking changes
+- ✅ **Testability**: Services can be tested independently of HTTP
+- ✅ **Maintainability**: Shared infrastructure reduces duplication
+- ✅ **Evolution**: Version-aware structure supports API evolution
+
+### Key Architectural Components
+
+1. **Dependency Injection (`dependencies/`)**
+   - Reusable request validators: `get_current_user`, `get_admin_user`, `get_owned_task_or_error`
+   - Cache dependency: `get_cache` for Redis integration
+   - Reduces boilerplate in endpoint handlers
+
+2. **Error Handling (`core/handlers.py`)**
+   - Global exception handlers for consistent error responses
+   - Custom exception classes for different error types
+   - Automatic JSON error formatting
+
+3. **Security (`core/security.py`)**
+   - JWT token generation and validation
+   - Refresh token rotation pattern
+   - Token claims extraction and validation
+
+4. **Caching (`core/cache_keys.py`, `services/cache_service.py`)**
+   - Redis integration for performance
+   - Intelligent cache key patterns
+   - Automatic invalidation on data changes
+
+5. **Real-time Updates (`core/websocket_manager.py`)**
+   - WebSocket connection management
+   - Task subscription system
+   - Broadcast notifications to subscribers
+
+6. **Background Tasks (`tasks/`)**
+   - Celery workers for async operations
+   - Email delivery pipeline
+   - Task processing workers
+
+### Design Patterns Used
+
+| Pattern | Location | Purpose |
+|---------|----------|---------|
+| **Dependency Injection** | `dependencies/` | Reduce coupling, improve testability |
+| **Service Layer** | `services/` | Separate business logic from HTTP |
+| **Repository** | `db/` | Abstract data access |
+| **Manager** | `websocket_manager.py` | Centralize WebSocket lifecycle |
+| **Observer** | `websocket_manager.py` | Broadcast task updates |
+| **Builder** | `cache_service.py` | Construct cache keys |
 
 ## License
 

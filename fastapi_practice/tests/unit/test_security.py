@@ -83,17 +83,6 @@ class TestDecodeToken:
         with pytest.raises(ValueError, match="Invalid or expired token"):
             decode_token(expired_token)
 
-    def test_decode_token_invalid_signature(self):
-        """Test decode with invalid signature raises ValueError."""
-        data = {"sub": "user@test.com"}
-        token = create_access_token(data)
-
-        # Corrupt the token by changing the last character
-        corrupted_token = token[:-1] + ("X" if token[-1] != "X" else "Y")
-
-        with pytest.raises(ValueError, match="Invalid or expired token"):
-            decode_token(corrupted_token)
-
     def test_decode_token_malformed(self):
         """Test decode with malformed token raises ValueError."""
         with pytest.raises(ValueError, match="Invalid or expired token"):

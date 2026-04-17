@@ -25,14 +25,14 @@ def make_user(id=1, email="user@test.com", hashed_password="hash_pwd_123", role=
 def make_refresh_token(id=1, user_id=1, token_hash="hash_123", expires_at=None):
     """Helper to create RefreshToken model instance."""
     if expires_at is None:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at = datetime.now() + timedelta(days=7)
 
     token = RefreshToken(
         id=id,
         user_id=user_id,
         token_hash=token_hash,
         expires_at=expires_at,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(),
         is_revoked=False,
     )
     return token
@@ -262,8 +262,7 @@ class TestRefreshAccessTokenService:
             id=1,
             user_id=1,
             token_hash="expired_hash",
-            expires_at=datetime.now(timezone.utc)
-            - timedelta(days=1),  # Expired 1 day ago
+            expires_at=datetime.now() - timedelta(days=1),  # Expired 1 day ago
         )
 
         # --- Mock token lookup query (find expired token) ---
