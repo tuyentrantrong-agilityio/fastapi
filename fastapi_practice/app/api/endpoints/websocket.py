@@ -5,10 +5,10 @@ from fastapi import APIRouter, WebSocket
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.websocket_manager import manager
-from ..core.security import decode_token
-from ..db.session import AsyncSessionLocal
-from ..models.task import Task
+from ...core.websocket_manager import manager
+from ...core.security import decode_token
+from ...db.session import AsyncSessionLocal
+from ...models.task import Task
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
@@ -46,7 +46,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
-            from ..models.user import User
+            from ...models.user import User
 
             result = await session.execute(select(User).where(User.email == email))
             user = result.scalars().first()

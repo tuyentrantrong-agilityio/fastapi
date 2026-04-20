@@ -1,13 +1,13 @@
 from fastapi import APIRouter, status, Depends
 from typing import List
 
-from ..schemas.project import ProjectCreate, ProjectResponse
-from ..schemas.task import TaskResponse
-from ..schemas.user import UserInDB
-from ..dependencies.user import get_current_user
-from ..db.session import get_async_session
+from ...schemas.project import ProjectCreate, ProjectResponse
+from ...schemas.task import TaskResponse
+from ...schemas.user import UserInDB
+from ...dependencies.user import get_current_user
+from ...db.session import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..services.project_service import (
+from ...services.project_service import (
     create_project_service,
     get_user_projects_service,
     assign_task_to_project_service,

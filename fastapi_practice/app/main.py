@@ -7,7 +7,7 @@ from .core.config import settings
 from .core.handlers import register_exception_handlers
 from .core.logging_config import setup_json_logging
 from .db.init_db import create_db_and_tables
-from .routers import user, task, project, websocket
+from .api.endpoints import user, task, project, websocket
 from .middleware.logging_middleware import LoggingMiddleware
 from .tasks.celery_app import celery_app
 

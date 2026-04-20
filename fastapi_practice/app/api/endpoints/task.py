@@ -5,26 +5,26 @@ from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from ..schemas.task import TaskCreate, TaskUpdate, TaskResponse
-from ..schemas.user import UserInDB
-from ..schemas.query import TaskFilterParams, SortDirection
-from ..core.exceptions import BadRequestException
-from ..core.cache_keys import task_list_cache_key, TASK_LIST_CACHE_TTL
-from ..core.websocket_manager import manager
-from ..dependencies.user import get_current_user
-from ..dependencies.task import get_owned_task_or_error
-from ..dependencies.cache import get_cache
-from ..db.session import get_async_session
-from ..services.task_service import (
+from ...schemas.task import TaskCreate, TaskUpdate, TaskResponse
+from ...schemas.user import UserInDB
+from ...schemas.query import TaskFilterParams, SortDirection
+from ...core.exceptions import BadRequestException
+from ...core.cache_keys import task_list_cache_key, TASK_LIST_CACHE_TTL
+from ...core.websocket_manager import manager
+from ...dependencies.user import get_current_user
+from ...dependencies.task import get_owned_task_or_error
+from ...dependencies.cache import get_cache
+from ...db.session import get_async_session
+from ...services.task_service import (
     create_task_service,
     get_user_tasks_filtered_service,
     update_task_service,
     delete_task_service,
 )
-from ..services.cache_service import CacheService
-from ..tasks.email_tasks import send_task_assigned_email_task
-from ..tasks.task_tasks import process_task_async
-from ..tasks.celery_app import celery_app
+from ...services.cache_service import CacheService
+from ...tasks.email_tasks import send_task_assigned_email_task
+from ...tasks.task_tasks import process_task_async
+from ...tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])

@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..schemas.user import (
+from ...schemas.user import (
     UserCreate,
     UserResponse,
     UserUpdate,
@@ -10,17 +10,17 @@ from ..schemas.user import (
     UserInDB,
     RefreshTokenRequest,
 )
-from ..dependencies.user import get_current_user, get_admin_user
-from ..db.session import get_async_session
-from ..services.user_service import (
+from ...dependencies.user import get_current_user, get_admin_user
+from ...db.session import get_async_session
+from ...services.user_service import (
     create_user_service,
     update_user_profile_service,
 )
-from ..services.auth_service import (
+from ...services.auth_service import (
     login_service,
     refresh_access_token_service,
 )
-from ..tasks.email_tasks import send_welcome_email_task
+from ...tasks.email_tasks import send_welcome_email_task
 
 router = APIRouter(prefix="/users", tags=["users"])
 
