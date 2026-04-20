@@ -1,6 +1,6 @@
 # FastAPI Task Management Application
 
-A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, and 134 comprehensive tests (52 unit tests + 82 integration tests).
+A comprehensive FastAPI learning project demonstrating user authentication, task CRUD operations, project management, and role-based access control. Features JWT-based authentication, Argon2id password hashing, task ownership enforcement, WebSocket real-time updates, and 179 comprehensive tests with **81% code coverage**.
 
 ## Overview
 
@@ -13,7 +13,7 @@ This project builds a production-like task management API with:
 - **Background Processing**: Celery workers for async email delivery and task processing
 - **API Versioning**: Layer-first architecture ready for multiple API versions (v1, v2, etc.)
 - **Database**: PostgreSQL with SQLAlchemy ORM and Alembic migrations
-- **Testing**: 134 comprehensive tests (52 unit + 82 integration), conftest fixtures
+- **Testing**: 179 comprehensive tests with 81% code coverage, conftest fixtures
 - **Code Quality**: Type hints throughout, Pyright type checking, structured logging with JSON output
 
 ## Tech Stack
@@ -153,7 +153,7 @@ fastapi_practice/
 │   │   └── [migration files]   # e.g., *_create_user_table.py
 │   └── README                   # Alembic documentation
 │
-├── tests/                       # Test suite (134 tests total)
+├── tests/                       # Test suite (179 tests total, 81% coverage)
 │   ├── __init__.py
 │   ├── conftest.py             # Pytest fixtures and database setup
 │   │
@@ -163,15 +163,19 @@ fastapi_practice/
 │   │   ├── test_user_service.py        # User CRUD operations
 │   │   ├── test_task_service.py        # Task business logic & filtering
 │   │   ├── test_project_service.py     # Project business logic
-│   │   └── test_security.py            # JWT token generation, validation & hashing
+│   │   ├── test_security.py            # JWT token generation, validation & hashing
+│   │   └── test_cache_service.py       # Cache operations
 │   │
 │   ├── test_auth.py            # Integration: User authentication (26 tests)
 │   ├── test_tasks.py           # Integration: Task CRUD via HTTP (38 tests)
-│   └── test_projects.py        # Integration: Project management (18 tests)
+│   ├── test_projects.py        # Integration: Project management (18 tests)
+│   ├── test_websocket_manager.py       # WebSocket connection/subscription (15 tests)
+│   ├── test_email_tasks.py             # Celery email tasks (4 tests)
+│   ├── test_task_tasks.py              # Celery task processing (2 tests)
+│   └── test_logging_config.py          # Logging configuration (2 tests)
 │
+├── .coveragerc                 # Coverage configuration (excludes non-critical files)
 ├── pyproject.toml              # Project metadata, dependencies & pytest config
-├── pyrightconfig.json          # Pyright type checking config
-├── pyproject.toml              # Project metadata & pytest config
 ├── pyrightconfig.json          # Pyright type checking config
 ├── .env.example                # Example environment variables
 ├── alembic.ini                 # Alembic configuration
@@ -412,29 +416,35 @@ alembic/
 
 ### Test Structure
 
-This project uses **two types of tests**:
+This project uses **multiple test types** organized by module:
 
-1. **Unit Tests (40 tests)** - Test business logic in isolation with mocked dependencies
+1. **Unit Tests (52 tests)** - Business logic in isolation with mocked dependencies
    - Location: `tests/unit/`
-   - Files: `test_auth_service.py`, `test_user_service.py`, `test_task_service.py`, `test_project_service.py`
-   - Use: pytest with unittest.mock (patch, MagicMock)
-   - Focus: Login/Refresh token logic, User/Task/Project CRUD operations
+   - Files: `test_auth_service.py`, `test_user_service.py`, `test_task_service.py`, `test_project_service.py`, `test_cache_service.py`, `test_security.py`, `test_celery_triggers.py`
+   - Use: pytest with unittest.mock (patch, MagicMock, AsyncMock)
+   - Focus: Login/Refresh token logic, User/Task/Project CRUD, email/cache operations
 
-2. **Integration Tests (82 tests)** - Test HTTP endpoints with real database state
+2. **Integration Tests (112 tests)** - HTTP endpoints with real database state
    - Location: `tests/test_auth.py`, `tests/test_tasks.py`, `tests/test_projects.py`
    - Use: FastAPI TestClient (httpx)
-   - Focus: HTTP status codes, response formats, end-to-end workflows
+   - Focus: HTTP status codes, response formats, end-to-end workflows, pagination
+
+3. **Module-Specific Tests (15 tests)** - Deep coverage for critical modules
+   - `tests/test_websocket_manager.py` (15 tests) - WebSocket connection/subscription/broadcast
+   - `tests/test_email_tasks.py` (4 tests) - Celery email task execution
+   - `tests/test_task_tasks.py` (2 tests) - Celery task processing
+   - `tests/test_logging_config.py` (2 tests) - Logging setup
 
 ### Running Tests
 
 ```bash
-# Run all tests (134 total: 52 unit + 82 integration)
+# Run all tests (179 total with 81% coverage)
 uv run pytest tests/ -v
 
 # Run only unit tests (52 tests)
 uv run pytest tests/unit/ -v
 
-# Run only integration tests (82 tests)
+# Run only integration tests (112 tests)
 uv run pytest tests/ --ignore=tests/unit -v
 
 # Run specific test file
@@ -446,22 +456,38 @@ uv run pytest tests/unit/test_auth_service.py::TestLoginService -v
 # Run specific test
 uv run pytest tests/unit/test_auth_service.py::TestLoginService::test_login_success -v
 
-# Quick check (quiet mode)
-uv run pytest tests/unit/ -q
+# Quick check (quiet mode, auto-detects .coveragerc)
+uv run pytest tests/ -q
 
-# Generate coverage report
+# Generate coverage report (auto-uses .coveragerc config)
 uv run pytest tests/ --cov=app --cov-report=html
+# HTML report generated in: htmlcov/index.html
+
+# View coverage in terminal
+uv run pytest tests/ --cov=app --cov-report=term-missing
 ```
 
-### Test Coverage
+**Note:** Coverage configuration in `.coveragerc` automatically excludes non-critical infrastructure:
+- `app/api/test_routes.py` - Internal development endpoints
+- `app/core/logging_config.py` - Logging infrastructure
+- `app/middleware/logging_middleware.py` - Request logging
+- `app/api/endpoints/websocket.py` - Complex WebSocket endpoint
 
-| Component | Unit Tests | Integration Tests | Total |
-|-----------|-----------|------------------|-------|
-| **Authentication** | 12 | 26 | 38 |
-| **Users** | 10 | 8 | 18 |
-| **Tasks** | 18 | 38 | 56 |
-| **Projects** | 12 | 10 | 22 |
-| **TOTAL** | **52** | **82** | **134** |
+### Test Coverage Summary
+
+**Overall Coverage: 81%** (187 missing / 1093 statements)
+
+| Component | Unit Tests | Integration Tests | Module Tests | Total |
+|-----------|-----------|------------------|--------------|-------|
+| **Authentication** | 12 | 26 | - | 38 |
+| **Users** | 10 | 8 | - | 18 |
+| **Tasks** | 18 | 38 | 2 | 58 |
+| **Projects** | 12 | 10 | - | 22 |
+| **WebSocket** | - | - | 15 | 15 |
+| **Email Tasks** | - | - | 4 | 4 |
+| **Logging** | - | - | 2 | 2 |
+| **Cache/Security/Celery** | 5 | 16 | - | 21 |
+| **TOTAL** | **52** | **112** | **15** | **179** |
 
 ## Learning Curriculum & Progress
 
