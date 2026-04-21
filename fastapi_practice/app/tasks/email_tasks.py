@@ -13,6 +13,7 @@ import asyncio
 import concurrent.futures
 import time
 import os
+from redis.asyncio import from_url
 from .celery_app import celery_app
 from ..services.email_service import email_service
 from ..core.config import settings
@@ -54,14 +55,38 @@ def run_async(coro):
 
 
 # Async email task functions (helper functions)
+async def _should_simulate_failure() -> bool:
+    """Check if email failure should be simulated.
+
+    Priority:
+    1. Check Redis key (set by /internal/simulate-failure endpoint)
+    2. Fall back to .env FAKE_EMAIL_FAILURE
+    """
+    try:
+        redis = await from_url(
+            settings.REDIS_URL, encoding="utf8", decode_responses=True
+        )
+        redis_value = await redis.get("test:fake_email_failure")
+        await redis.close()
+
+        if redis_value is not None:
+            return redis_value.lower() == "true"
+    except Exception as e:
+        logger.debug(f"Redis check failed, using .env: {e}")
+
+    # Fall back to .env
+    return settings.FAKE_EMAIL_FAILURE
+
+
 async def _send_welcome_email(
     email: str, user_name: str = "User", retry_count: int = 0
 ):
     """Internal: Send welcome email (async)"""
 
     # TEST: Fake failure to test retry mechanism
-    if settings.TEST_MODE and settings.FAKE_EMAIL_FAILURE:
-        if random.random() < settings.FAKE_FAILURE_RATE:
+    if settings.TEST_MODE:
+        should_fail = await _should_simulate_failure()
+        if should_fail and random.random() < settings.FAKE_FAILURE_RATE:
             logger.info(
                 f"[TEST-FAIL] Simulating failure for {email} (attempt #{retry_count + 1})"
             )
@@ -106,69 +131,6 @@ FastAPI Practice Team
         raise Exception("Email service failed")
 
 
-async def _send_password_reset_email(
-    email: str, reset_link: str, user_name: str = "User", retry_count: int = 0
-):
-    """Internal: Send password reset email (async)"""
-    logger.info(f"[CELERY-TASK] send_password_reset_email_task STARTED")
-    logger.debug(f"  Email: {email}, User: {user_name}, Retry: {retry_count}")
-
-    if settings.TEST_MODE and settings.FAKE_EMAIL_FAILURE:
-        if random.random() < settings.FAKE_FAILURE_RATE:
-            logger.warning(
-                f"[CELERY-TEST] Simulating failure for {email} (attempt #{retry_count + 1})"
-            )
-            raise Exception(f"[FAKE] Simulated failure (attempt #{retry_count + 1})")
-
-    subject = "Reset Your Password - FastAPI Practice"
-    html_content = f"""
-<html>
-    <body style="font-family: Arial, sans-serif;">
-        <h1>Password Reset Request</h1>
-        <p>Hi {user_name},</p>
-        <p>We received a request to reset your password.</p>
-        <p>
-            <a href="{reset_link}" 
-               style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Reset Password
-            </a>
-        </p>
-        <p style="color: #666;">This link expires in 30 minutes.</p>
-        <p style="color: #666; font-size: 12px;">
-            If you didn't request a password reset, please ignore this email.
-        </p>
-    </body>
-</html>
-    """
-    plain_content = f"""
-Password Reset Request
-
-Hi {user_name},
-
-Click here to reset your password:
-{reset_link}
-
-This link expires in 30 minutes.
-
-Regards,
-FastAPI Practice Team
-    """
-
-    success = await email_service.send_email(
-        to=email,
-        subject=subject,
-        html_content=html_content,
-        plain_content=plain_content,
-    )
-    logger.debug(f"  Email service returned: {success}")
-
-    if success:
-        logger.info(f"[CELERY-SUCCESS] Password reset email sent to {email}")
-        return {"status": "sent", "email": email}
-    else:
-        raise Exception("Email service returned False")
-
-
 async def _send_task_assigned_email(
     email: str,
     user_name: str,
@@ -183,8 +145,9 @@ async def _send_task_assigned_email(
         f"  Email: {email}, Task: {task_title} (ID: {task_id}), Assigned by: {assigned_by}, Retry: {retry_count}"
     )
 
-    if settings.TEST_MODE and settings.FAKE_EMAIL_FAILURE:
-        if random.random() < settings.FAKE_FAILURE_RATE:
+    if settings.TEST_MODE:
+        should_fail = await _should_simulate_failure()
+        if should_fail and random.random() < settings.FAKE_FAILURE_RATE:
             logger.warning(
                 f"[CELERY-TEST] Simulating failure for {email} (attempt #{retry_count + 1})"
             )
@@ -265,32 +228,6 @@ def send_welcome_email_task(self, email: str, user_name: str = "User"):
         duration = time.time() - start_time
         logger.error(f"[ERROR] id={task_id} email={email} error={str(exc)}")
         logger.warning(f"[RETRY] id={task_id} retry={retry_count + 1}")
-        raise self.retry(exc=exc, countdown=5)
-
-
-@celery_app.task(
-    bind=True, autoretry_for=(Exception,), max_retries=3, default_retry_delay=5
-)
-def send_password_reset_email_task(
-    self, email: str, reset_link: str, user_name: str = "User"
-):
-    """Send password reset email."""
-    logger.info(f"[CELERY] ===== Task send_password_reset_email_task QUEUED =====")
-    try:
-        result = run_async(
-            _send_password_reset_email(
-                email, reset_link, user_name, retry_count=self.request.retries
-            )
-        )
-        logger.info(
-            f"[CELERY] ===== Task send_password_reset_email_task COMPLETED ====="
-        )
-        return result
-    except Exception as exc:
-        logger.error(f"[CELERY-ERROR] Task failed: {str(exc)}")
-        logger.info(
-            f"[CELERY] ===== Retrying (attempt #{self.request.retries + 1}/3) ====="
-        )
         raise self.retry(exc=exc, countdown=5)
 
 

@@ -34,20 +34,6 @@ class TestEmailTasksCoverage:
             )
 
     @pytest.mark.asyncio
-    async def test_password_reset_email_basic(self):
-        """Test password reset email execution path."""
-        with patch(
-            "app.tasks.email_tasks.email_service.send_email", new_callable=AsyncMock
-        ) as mock_send:
-            mock_send.return_value = True
-
-            from app.tasks.email_tasks import send_password_reset_email_task
-
-            result = send_password_reset_email_task(
-                "test@example.com", "https://example.com/reset/token123", "Test User"
-            )
-
-    @pytest.mark.asyncio
     async def test_email_send_failure(self):
         """Test email sending when service fails."""
         with patch(

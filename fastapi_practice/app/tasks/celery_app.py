@@ -14,20 +14,20 @@ celery_app = Celery(__name__)
 
 def configure_celery(app_name: str = "fastapi_practice"):
     """Configure Celery with Redis broker & async execution.
-    
+
     IMPORTANT: Both TEST_MODE=True and TEST_MODE=False use the SAME Celery config!
-    
+
     [OK] Redis broker: Same URL for both modes
     [OK] Async execution: Both modes queue tasks to Redis
     [OK] Worker processing: Both modes need separate celery worker
     [OK] Task persistence: Both modes save to Redis
     [OK] Retry mechanism: Both modes support retries
     [OK] Parallel processing: Both modes support concurrency
-    
+
     ONLY DIFFERENCE:
     [NO] TEST_MODE=True: Test endpoints (/test/*) ENABLED
     [NO] TEST_MODE=False: Test endpoints (/test/*) DISABLED (403)
-    
+
     This ensures:
     - Development team can test Celery/Redis in practice mode
     - Test endpoints won't leak into production (TEST_MODE=false)
@@ -38,10 +38,11 @@ def configure_celery(app_name: str = "fastapi_practice"):
     # ========== ASYNC CONFIGURATION (BOTH MODES) ==========
     # Celery + Redis configured for async task queue
     # Requires: Redis server + Celery worker running
-    
+
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     # Use logging instead of print to avoid stdout contamination
     # (print interferes with JSON generation for OpenAPI export)
     logger.info("[CELERY] Production-Ready Async Configuration")
@@ -56,11 +57,11 @@ def configure_celery(app_name: str = "fastapi_practice"):
         logger.info("  [ENABLED] Test endpoints (/test/*) ENABLED")
     else:
         logger.info("  [DISABLED] Test endpoints (/test/*) DISABLED")
-    
+
     # Same config for both TEST_MODE=true and TEST_MODE=false
     celery_app.conf.update(
-        broker_url=settings.CELERY_BROKER_URL,
-        result_backend=settings.CELERY_RESULT_BACKEND,
+        broker_url=settings.CELERY_BROKER_URL,  # Redis broker save tasks
+        result_backend=settings.CELERY_RESULT_BACKEND,  # Redis backend save results
         broker_connection_retry_on_startup=False,  # Don't hang on startup if broker down
         broker_connection_retry=True,
         broker_connection_max_retries=3,  # Retry 3 times, fail fast

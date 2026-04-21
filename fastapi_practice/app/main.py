@@ -23,6 +23,18 @@ async def lifespan(app: FastAPI):
     # Startup: Create database tables
     await create_db_and_tables()
     logger.info("Database tables created successfully!")
+
+    # Log accessible URLs for development
+    logger.info("[STARTUP] FastAPI Practice API is running!")
+    logger.info("Access the API at:")
+    logger.info("   - http://localhost:8000/        (Main API)")
+    logger.info("   - http://localhost:8000/docs    (Interactive API docs - Swagger)")
+    logger.info("   - http://localhost:8000/redoc   (ReDoc documentation)")
+    if settings.TEST_MODE:
+        logger.info(
+            "   - http://localhost:8000/internal/* (Test endpoints - TEST_MODE=True)"
+        )
+
     yield
 
 

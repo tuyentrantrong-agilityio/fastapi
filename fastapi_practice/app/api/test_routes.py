@@ -14,6 +14,7 @@ These endpoints allow real-world testing of:
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.asyncio import from_url
 from ..core.config import settings
 from ..tasks.email_tasks import send_welcome_email_task
 
@@ -128,7 +129,7 @@ async def internal_bulk_email(count: int = 10):
 async def internal_simulate_failure(enable: bool):
     """[INTERNAL ONLY] Enable/disable simulated email failures to test retry mechanism.
 
-    When enabled: 50% of email tasks will fail to trigger Celery retry logic
+    When enabled: FAKE_FAILURE_RATE % of email tasks will fail to trigger Celery retry logic
 
     Verifies: Retry delays, max_retries, exponential backoff
 
@@ -147,24 +148,35 @@ async def internal_simulate_failure(enable: bool):
     print("\n" + "=" * 60)
     print("[INTERNAL] Retry Mechanism Test")
     print("=" * 60)
-    if enable:
-        print("[OK] Simulated failures ENABLED (50% chance)")
-        print("   Next /internal/send-email will simulate failures")
-        print("   Expected pattern:")
-        print("   [NO] FAILED (attempt 1/3)")
-        print("   [RETRY] Retry in 5s... (attempt 2/3)")
-        print("   [NO] FAILED (attempt 2/3)")
-        print("   [RETRY] Retry in 5s... (attempt 3/3)")
-        print("   [OK] SUCCESS (or FAILED - max retries)")
-    else:
-        print("[OK] Fake failure DISABLED")
-        print("   All emails will send normally")
-    print("=" * 60 + "\n")
 
-    settings.FAKE_EMAIL_FAILURE = enable
+    try:
+        # Save to Redis so Celery worker can read it
+        redis = await from_url(
+            settings.REDIS_URL, encoding="utf8", decode_responses=True
+        )
+        await redis.set("test:fake_email_failure", str(enable))
+        await redis.close()
+
+        if enable:
+            print("[OK] Simulated failures ENABLED")
+            print("   Next /internal/send-email will simulate failures")
+            print(f"   Failure rate: {settings.FAKE_FAILURE_RATE * 100:.0f}%")
+            print("   Expected pattern:")
+            print("   [TEST-FAIL] Simulating failure")
+            print("   [RETRY] Retry in 5s... (attempt 1/3)")
+            print("   [TEST-FAIL] Simulating failure")
+            print("   [RETRY] Retry in 5s... (attempt 2/3)")
+            print("   [OK] SUCCESS (or FAILED - max retries)")
+        else:
+            print("[OK] Fake failure DISABLED")
+            print("   All emails will send normally")
+        print("=" * 60 + "\n")
+    except Exception as e:
+        print(f"[ERROR] Failed to update Redis: {e}")
+        raise HTTPException(status_code=500, detail=f"Redis error: {str(e)}")
 
     return {
         "fake_failure": enable,
-        "message": "Fake failure simulation toggled",
-        "info": "When enabled, 50% of emails will fail to test retry mechanism",
+        "message": "Fake failure simulation toggled via Redis",
+        "info": f"When enabled, {settings.FAKE_FAILURE_RATE * 100:.0f}% of emails will fail to test retry mechanism",
     }
