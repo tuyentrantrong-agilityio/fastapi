@@ -41,3 +41,4 @@ docker-compose.yml
 .env.local
 .env.*.local
 .env.secrets
+test_app.db

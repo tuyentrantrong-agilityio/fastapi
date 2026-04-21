@@ -234,7 +234,7 @@ This project follows a **three-tier layered architecture** with API versioning s
 
 ## Advanced Features
 
-### 🔄 Real-time Updates with WebSocket
+###  Real-time Updates with WebSocket
 
 Live task notifications for subscribed clients:
 
@@ -261,7 +261,7 @@ ws://localhost:8000/ws?token=<jwt_token>
 - Dynamic subscriptions (subscribe/unsubscribe at runtime)
 - Broadcast notifications on task updates
 
-### 💾 Redis Caching
+###  Redis Caching
 
 Intelligent caching layer for task lists with TTL and auto-invalidation:
 
@@ -278,7 +278,7 @@ X-Cache-Key: tasks:u1:...      # Cache key used
 X-Cache-Store: OK|ERROR        # Whether cache store succeeded
 ```
 
-### 📧 Async Email Delivery with Celery
+###  Async Email Delivery with Celery
 
 Background workers handle non-blocking email operations:
 
@@ -659,11 +659,11 @@ app/
 ```
 
 **Benefits:**
-- ✅ **Clear Responsibilities**: Each layer has single responsibility
-- ✅ **Scalability**: Easy to add `/api/v2/endpoints/` for breaking changes
-- ✅ **Testability**: Services can be tested independently of HTTP
-- ✅ **Maintainability**: Shared infrastructure reduces duplication
-- ✅ **Evolution**: Version-aware structure supports API evolution
+-  **Clear Responsibilities**: Each layer has single responsibility
+-  **Scalability**: Easy to add `/api/v2/endpoints/` for breaking changes
+-  **Testability**: Services can be tested independently of HTTP
+-  **Maintainability**: Shared infrastructure reduces duplication
+-  **Evolution**: Version-aware structure supports API evolution
 
 ### Key Architectural Components
 
