@@ -9,8 +9,9 @@ Tests cover:
 - Transaction/rollback scenarios
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.unit
@@ -22,8 +23,8 @@ async def test_task_creation_logic(async_session, test_user):
     - Create task with valid data
     - Expected: Task created with correct fields
     """
-    from app.services.task_service import create_task_service
     from app.schemas.task import TaskCreate
+    from app.services.task_service import create_task_service
 
     task_data = TaskCreate(
         title="New Task",
@@ -73,8 +74,9 @@ async def test_task_validation_title_required():
     - Try to create task without title
     - Expected: Validation error
     """
-    from app.schemas.task import TaskCreate
     from pydantic import ValidationError
+
+    from app.schemas.task import TaskCreate
 
     # TaskCreate schema should require title
     with pytest.raises((ValidationError, ValueError, TypeError)):
@@ -93,8 +95,8 @@ async def test_task_update_partial_fields(async_session, test_user, test_task):
     - Update only status field, leave others unchanged
     - Expected: Only status changed
     """
-    from app.services.task_service import update_task_service
     from app.schemas.task import TaskUpdate
+    from app.services.task_service import update_task_service
 
     original_title = test_task.title
 
@@ -119,8 +121,8 @@ async def test_task_creation_rollback_on_error(async_session, test_user):
     - Create task but DB commit fails
     - Expected: Transaction rolled back, no partial data
     """
-    from app.services.task_service import create_task_service
     from app.schemas.task import TaskCreate
+    from app.services.task_service import create_task_service
 
     # Mock session.commit to fail
     with patch.object(async_session, "commit", side_effect=Exception("DB error")):

@@ -1,17 +1,18 @@
 """Unit tests for security functions (JWT token generation and validation)."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from jose import jwt
 
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
     decode_token,
     generate_refresh_token,
-    hash_refresh_token,
     get_jwt_algorithm,
+    hash_refresh_token,
 )
-from app.core.config import settings
 
 
 class TestCreateAccessToken:
@@ -28,9 +29,7 @@ class TestCreateAccessToken:
         assert len(token) > 0
 
         # Decode and verify claims
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         assert payload["sub"] == "user@test.com"
         assert "exp" in payload
 
@@ -42,9 +41,7 @@ class TestCreateAccessToken:
         token = create_access_token(data, expires_delta=custom_expires)
 
         # Decode and verify expiration is set correctly
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
         now = datetime.now(timezone.utc)
 
@@ -75,9 +72,7 @@ class TestDecodeToken:
         # Manually encode token with past expiration
         to_encode = data.copy()
         to_encode.update({"exp": past_expire})
-        expired_token = jwt.encode(
-            to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-        )
+        expired_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
         # Attempt to decode expired token
         with pytest.raises(ValueError, match="Invalid or expired token"):

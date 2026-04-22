@@ -1,12 +1,11 @@
 """WebSocket endpoint for real-time task updates with dynamic subscriptions"""
 
 import logging
-from fastapi import APIRouter, WebSocket
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core.websocket_manager import manager
+from fastapi import APIRouter, WebSocket
+
 from ...core.security import decode_token
+from ...core.websocket_manager import manager
 from ...db.session import AsyncSessionLocal
 from ...models.task import Task
 
@@ -46,6 +45,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select
+
             from ...models.user import User
 
             result = await session.execute(select(User).where(User.email == email))
@@ -87,9 +87,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 try:
                     # Verify task exists + user owns it
                     async with AsyncSessionLocal() as session:
-                        result = await session.execute(
-                            select(Task).where(Task.id == task_id)
-                        )
+                        result = await session.execute(select(Task).where(Task.id == task_id))
                         task = result.scalars().first()
 
                     if not task:
@@ -133,15 +131,11 @@ async def websocket_endpoint(websocket: WebSocket):
             elif action == "unsubscribe":
                 # Client stops listening
                 await manager.unsubscribe(user_id, websocket, task_id)
-                await websocket.send_json(
-                    {"event": "unsubscription_confirmed", "task_id": task_id}
-                )
+                await websocket.send_json({"event": "unsubscription_confirmed", "task_id": task_id})
                 logger.debug(f"User {user_id} unsubscribed from task {task_id}")
 
             else:
-                await websocket.send_json(
-                    {"event": "error", "error": f"Unknown action: {action}"}
-                )
+                await websocket.send_json({"event": "error", "error": f"Unknown action: {action}"})
 
     except Exception as e:
         logger.error(f"WebSocket error for user {user_id}: {e}")

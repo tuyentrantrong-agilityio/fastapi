@@ -5,10 +5,12 @@ This module provides centralized error handling for the FastAPI application,
 ensuring consistent error response formats across all endpoints.
 """
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
-from .exceptions import ApplicationException
 import logging
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+
+from .exceptions import ApplicationException
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +27,7 @@ def register_exception_handlers(app: FastAPI):
     """
 
     @app.exception_handler(ApplicationException)
-    async def application_exception_handler(
-        request: Request, exc: ApplicationException
-    ):
+    async def application_exception_handler(request: Request, exc: ApplicationException):
         """
         Handle custom ApplicationException and its subclasses.
 

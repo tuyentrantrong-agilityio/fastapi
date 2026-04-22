@@ -7,6 +7,7 @@ Phase 2: Celery + Redis (replacing BackgroundTasks)
 """
 
 from celery import Celery
+
 from ..core.config import settings
 
 celery_app = Celery(__name__)

@@ -1,15 +1,15 @@
-﻿from contextlib import asynccontextmanager
 import logging
-import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from .api.endpoints import project, task, user, websocket
 from .core.config import settings
 from .core.handlers import register_exception_handlers
 from .core.logging_config import setup_json_logging
 from .db.init_db import create_db_and_tables
-from .api.endpoints import user, task, project, websocket
 from .middleware.logging_middleware import LoggingMiddleware
-from .tasks.celery_app import celery_app
 
 # Setup logging FIRST
 setup_json_logging(use_json=settings.DEBUG is False)
@@ -31,9 +31,7 @@ async def lifespan(app: FastAPI):
     logger.info("   - http://localhost:8000/docs    (Interactive API docs - Swagger)")
     logger.info("   - http://localhost:8000/redoc   (ReDoc documentation)")
     if settings.TEST_MODE:
-        logger.info(
-            "   - http://localhost:8000/internal/* (Test endpoints - TEST_MODE=True)"
-        )
+        logger.info("   - http://localhost:8000/internal/* (Test endpoints - TEST_MODE=True)")
 
     yield
 
@@ -72,9 +70,7 @@ if settings.TEST_MODE:
     from .api.test_routes import router as internal_router
 
     app.include_router(internal_router)
-    logger.info(
-        "[STARTUP]  Internal integration test routes registered (TEST_MODE=True)"
-    )
+    logger.info("[STARTUP]  Internal integration test routes registered (TEST_MODE=True)")
 
 
 @app.get("/")

@@ -216,8 +216,9 @@ class TestProtectedEndpoint:
         Should return 401 Unauthorized.
         """
         # Create an expired token (already handled by the decode_token function)
-        from app.core.security import create_access_token
         from datetime import timedelta
+
+        from app.core.security import create_access_token
 
         expired_token = create_access_token(
             data={"sub": test_user.email},
@@ -500,9 +501,7 @@ class TestRefreshToken:
 
         assert response.status_code == 422
 
-    def test_refresh_token_enables_new_requests(
-        self, client, test_user, test_user_data
-    ):
+    def test_refresh_token_enables_new_requests(self, client, test_user, test_user_data):
         """
         Test that refreshed token can be used to access protected endpoints.
         """
@@ -535,9 +534,7 @@ class TestRefreshToken:
         data = protected_response.json()
         assert data["email"] == test_user_data["email"]
 
-    def test_refresh_token_different_from_access_token(
-        self, client, test_user, test_user_data
-    ):
+    def test_refresh_token_different_from_access_token(self, client, test_user, test_user_data):
         """
         Test that refresh token is different from access token.
         """
@@ -557,9 +554,7 @@ class TestRefreshToken:
         # Refresh token should be longer (64 char hex from secrets.token_hex)
         assert len(refresh_token) > len(access_token.split(".")[0])
 
-    def test_refresh_token_returns_new_access_token(
-        self, client, test_user, test_user_data
-    ):
+    def test_refresh_token_returns_new_access_token(self, client, test_user, test_user_data):
         """
         Test that refresh returns a valid new access token.
         """

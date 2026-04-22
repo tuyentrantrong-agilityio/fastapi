@@ -12,9 +12,11 @@ These endpoints allow real-world testing of:
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends
-from redis.exceptions import ConnectionError as RedisConnectionError
+
+from fastapi import APIRouter, HTTPException
 from redis.asyncio import from_url
+from redis.exceptions import ConnectionError as RedisConnectionError
+
 from ..core.config import settings
 from ..tasks.email_tasks import send_welcome_email_task
 
@@ -33,9 +35,7 @@ async def internal_send_email(email: str = "test@example.com"):
     Only available when TEST_MODE=True
     """
     if not settings.TEST_MODE:
-        raise HTTPException(
-            status_code=403, detail="Internal tools disabled (TEST_MODE=False)"
-        )
+        raise HTTPException(status_code=403, detail="Internal tools disabled (TEST_MODE=False)")
 
     print("\n" + "=" * 60)
     print("[INTERNAL] Email Task Pipeline Test")
@@ -93,9 +93,7 @@ async def internal_bulk_email(count: int = 10):
     Only available when TEST_MODE=True
     """
     if not settings.TEST_MODE:
-        raise HTTPException(
-            status_code=403, detail="Internal tools disabled (TEST_MODE=False)"
-        )
+        raise HTTPException(status_code=403, detail="Internal tools disabled (TEST_MODE=False)")
 
     print("\n" + "=" * 60)
     print("[INTERNAL] Concurrency & Queue Test")
@@ -112,9 +110,7 @@ async def internal_bulk_email(count: int = 10):
         task_ids.append(task.id)
 
     print(f"[OK] All {count} tasks enqueued!")
-    print(
-        f"   [STATS] When worker/concurrency=4: should see 4 tasks running in parallel"
-    )
+    print("   [STATS] When worker/concurrency=4: should see 4 tasks running in parallel")
     print("=" * 60 + "\n")
 
     return {
@@ -141,9 +137,7 @@ async def internal_simulate_failure(enable: bool):
     Only available when TEST_MODE=True
     """
     if not settings.TEST_MODE:
-        raise HTTPException(
-            status_code=403, detail="Internal tools disabled (TEST_MODE=False)"
-        )
+        raise HTTPException(status_code=403, detail="Internal tools disabled (TEST_MODE=False)")
 
     print("\n" + "=" * 60)
     print("[INTERNAL] Retry Mechanism Test")
@@ -151,9 +145,7 @@ async def internal_simulate_failure(enable: bool):
 
     try:
         # Save to Redis so Celery worker can read it
-        redis = await from_url(
-            settings.REDIS_URL, encoding="utf8", decode_responses=True
-        )
+        redis = await from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
         await redis.set("test:fake_email_failure", str(enable))
         await redis.close()
 

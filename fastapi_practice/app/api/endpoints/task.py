@@ -1,30 +1,30 @@
-from fastapi import APIRouter, status, Depends, Query, Response
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from typing import Optional, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+from typing import Any, Dict, Optional
 
-from ...schemas.task import TaskCreate, TaskUpdate, TaskResponse
-from ...schemas.user import UserInDB
-from ...schemas.query import TaskFilterParams, SortDirection
+from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...core.cache_keys import TASK_LIST_CACHE_TTL, task_list_cache_key
 from ...core.exceptions import BadRequestException
-from ...core.cache_keys import task_list_cache_key, TASK_LIST_CACHE_TTL
 from ...core.websocket_manager import manager
-from ...dependencies.user import get_current_user
-from ...dependencies.task import get_owned_task_or_error
-from ...dependencies.cache import get_cache
 from ...db.session import get_async_session
+from ...dependencies.cache import get_cache
+from ...dependencies.task import get_owned_task_or_error
+from ...dependencies.user import get_current_user
+from ...schemas.query import SortDirection, TaskFilterParams
+from ...schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from ...schemas.user import UserInDB
+from ...services.cache_service import CacheService
 from ...services.task_service import (
     create_task_service,
+    delete_task_service,
     get_user_tasks_filtered_service,
     update_task_service,
-    delete_task_service,
 )
-from ...services.cache_service import CacheService
 from ...tasks.email_tasks import send_task_assigned_email_task
 from ...tasks.task_tasks import process_task_async
-from ...tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -99,9 +99,7 @@ async def get_all_tasks(
         description="Sort direction: asc or desc",
     ),
     page: Optional[int] = Query(1, ge=1, description="Page number (1-based)"),
-    limit: Optional[int] = Query(
-        10, ge=1, le=100, description="Items per page (max 100)"
-    ),
+    limit: Optional[int] = Query(10, ge=1, le=100, description="Items per page (max 100)"),
 ):
     """
     Get all tasks belonging to current user with advanced filtering, search, sorting, and pagination.
@@ -269,9 +267,7 @@ async def update_task(
                 "status": result.status,
                 "title": result.title,
                 "description": result.description,
-                "updated_at": result.updated_at.isoformat()
-                if result.updated_at
-                else None,
+                "updated_at": result.updated_at.isoformat() if result.updated_at else None,
                 "user_id": result.user_id,
             },
         )
@@ -279,9 +275,7 @@ async def update_task(
     except Exception as e:
         # WebSocket broadcast failure should NOT crash the update endpoint
         # Task is already updated in DB, just real-time notification failed
-        logger.error(
-            f"WebSocket broadcast failed for task {task_id}: {e}", exc_info=True
-        )
+        logger.error(f"WebSocket broadcast failed for task {task_id}: {e}", exc_info=True)
 
     return result
 

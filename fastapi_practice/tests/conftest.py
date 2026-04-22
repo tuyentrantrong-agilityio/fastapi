@@ -10,20 +10,18 @@ This module provides fixtures for:
 - Test markers (unit, integration)
 """
 
+from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from datetime import timedelta
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import insert
-from unittest.mock import AsyncMock, MagicMock
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.main import app
 from app.core.security import create_access_token
-from app.core.hashing import hash_password
 from app.db.base import SQLModel
 from app.db.session import get_async_session
-from app.models.user import User
+from app.main import app
 
 
 def pytest_configure(config):
@@ -45,7 +43,6 @@ def mock_celery_tasks(request, monkeypatch):
     if "unit" in [marker.name for marker in request.node.iter_markers()]:
         return
 
-    from unittest.mock import MagicMock
     from app.tasks import email_tasks, task_tasks
 
     # Create mocks that return immediately (Mock objects are callable and return another Mock)
@@ -55,9 +52,7 @@ def mock_celery_tasks(request, monkeypatch):
 
     # Patch the task objects in their modules
     monkeypatch.setattr(email_tasks, "send_welcome_email_task", mock_send_welcome)
-    monkeypatch.setattr(
-        email_tasks, "send_task_assigned_email_task", mock_send_task_assigned
-    )
+    monkeypatch.setattr(email_tasks, "send_task_assigned_email_task", mock_send_task_assigned)
     monkeypatch.setattr(task_tasks, "process_task_async", mock_process_task)
 
 
@@ -174,8 +169,8 @@ async def test_user(test_user_data, async_session):
     Returns:
         User: Created user object
     """
-    from app.services.user_service import create_user_service
     from app.schemas.user import UserCreate
+    from app.services.user_service import create_user_service
 
     user_create = UserCreate(
         email=test_user_data["email"],
@@ -203,8 +198,8 @@ async def test_admin_user(async_session):
     Returns:
         User: Created admin user object
     """
-    from app.services.user_service import create_user_service
     from app.schemas.user import UserCreate
+    from app.services.user_service import create_user_service
 
     admin_create = UserCreate(
         email="admin@example.com",
@@ -301,8 +296,8 @@ async def test_user_2(async_session):
     Returns:
         User: Created user object
     """
-    from app.services.user_service import create_user_service
     from app.schemas.user import UserCreate
+    from app.services.user_service import create_user_service
 
     user_create = UserCreate(
         email="testuser2@example.com",

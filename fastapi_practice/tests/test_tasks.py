@@ -10,7 +10,6 @@ Comprehensive tests covering:
 
 import pytest
 from fastapi import status
-from datetime import datetime, timezone
 
 
 @pytest.fixture
@@ -160,9 +159,7 @@ class TestTaskRead:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_tasks_pagination(
-        self, client, auth_headers, test_user, create_test_task
-    ):
+    def test_get_tasks_pagination(self, client, auth_headers, test_user, create_test_task):
         """Test task pagination."""
         # Create 10 tasks
         for i in range(10):
@@ -293,9 +290,7 @@ class TestTaskFiltering:
         # Invalid status returns 400 Bad Request
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_search_by_title_case_insensitive(
-        self, client, auth_headers, create_test_task
-    ):
+    def test_search_by_title_case_insensitive(self, client, auth_headers, create_test_task):
         """Test case-insensitive title search."""
         create_test_task("Learn FastAPI", "todo")
         create_test_task("Python Basics", "todo")
@@ -317,9 +312,7 @@ class TestTaskFiltering:
         assert len(response_lower.json()["data"]) == 1
         assert len(response_upper.json()["data"]) == 1
 
-    def test_search_by_title_partial_match(
-        self, client, auth_headers, create_test_task
-    ):
+    def test_search_by_title_partial_match(self, client, auth_headers, create_test_task):
         """Test partial title search."""
         create_test_task("Learn FastAPI", "todo")
         create_test_task("FastAPI Documentation", "todo")
@@ -509,9 +502,7 @@ class TestTaskDataConsistency:
         assert data["created_at"] is not None
         assert data["updated_at"] is not None
 
-    def test_updated_task_timestamp_changed(
-        self, client, auth_headers, create_test_task
-    ):
+    def test_updated_task_timestamp_changed(self, client, auth_headers, create_test_task):
         """Test that updated_at changes on update."""
         task = create_test_task("Original")
         original_updated_at = task["updated_at"]
@@ -530,9 +521,7 @@ class TestTaskDataConsistency:
         updated_task = response.json()
         assert updated_task["updated_at"] > original_updated_at
 
-    def test_user_id_preserved_on_update(
-        self, client, auth_headers, test_user, create_test_task
-    ):
+    def test_user_id_preserved_on_update(self, client, auth_headers, test_user, create_test_task):
         """Test that user_id doesn't change on update."""
         task = create_test_task("Task")
         original_user_id = task["user_id"]

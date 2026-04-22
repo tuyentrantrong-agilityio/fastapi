@@ -62,9 +62,7 @@ class ForbiddenException(ApplicationException):
     HTTP Status: 403 Forbidden
     """
 
-    def __init__(
-        self, detail: str = "You don't have permission to access this resource"
-    ):
+    def __init__(self, detail: str = "You don't have permission to access this resource"):
         """
         Initialize ForbiddenException.
 

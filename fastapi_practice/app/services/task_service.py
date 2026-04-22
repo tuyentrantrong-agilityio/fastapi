@@ -1,22 +1,20 @@
 """Task service - handles task business logic."""
 
-from datetime import datetime
-from typing import Optional, Dict, Any
 import math
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from sqlmodel import select
-from sqlalchemy import or_, func
+from sqlalchemy import func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
-from ..schemas.task import TaskCreate, TaskUpdate
-from ..schemas.query import SortDirection
 from ..core.exceptions import BadRequestException, NotFoundException
 from ..models.task import Task
+from ..schemas.query import SortDirection
+from ..schemas.task import TaskCreate, TaskUpdate
 
 
-async def create_task_service(
-    session: AsyncSession, task: TaskCreate, user_id: int
-) -> Task:
+async def create_task_service(session: AsyncSession, task: TaskCreate, user_id: int) -> Task:
     """
     Create a new task for user.
 
@@ -125,9 +123,7 @@ async def get_user_tasks_filtered_service(
         statement = statement.order_by(sort_column)
 
     # Pagination - count filtered results efficiently
-    count_stmt = (
-        select(func.count(Task.id)).select_from(Task).where(Task.user_id == user_id)
-    )
+    count_stmt = select(func.count(Task.id)).select_from(Task).where(Task.user_id == user_id)
     count_stmt = apply_filters(count_stmt)
     count_result = await session.execute(count_stmt)
     total = count_result.scalar()
@@ -150,9 +146,7 @@ async def get_user_tasks_filtered_service(
     }
 
 
-async def update_task_service(
-    session: AsyncSession, task_id: int, task_update: TaskUpdate
-) -> Task:
+async def update_task_service(session: AsyncSession, task_id: int, task_update: TaskUpdate) -> Task:
     """
     Update a task.
 

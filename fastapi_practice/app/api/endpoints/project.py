@@ -1,16 +1,17 @@
-from fastapi import APIRouter, status, Depends
 from typing import List
 
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...db.session import get_async_session
+from ...dependencies.user import get_current_user
 from ...schemas.project import ProjectCreate, ProjectResponse
 from ...schemas.task import TaskResponse
 from ...schemas.user import UserInDB
-from ...dependencies.user import get_current_user
-from ...db.session import get_async_session
-from sqlalchemy.ext.asyncio import AsyncSession
 from ...services.project_service import (
+    assign_task_to_project_service,
     create_project_service,
     get_user_projects_service,
-    assign_task_to_project_service,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -80,6 +81,4 @@ async def assign_task_to_project(
         404 Not Found: If task or project doesn't exist
         403 Forbidden: If user is not the owner of task or project
     """
-    return await assign_task_to_project_service(
-        session, project_id, task_id, current_user.id
-    )
+    return await assign_task_to_project_service(session, project_id, task_id, current_user.id)

@@ -1,13 +1,12 @@
 from fastapi import Depends
-
-from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
-from ..core.security import oauth2_scheme, decode_token
-from ..core.exceptions import UnauthorizedException, ForbiddenException
-from ..schemas.user import UserInDB
-from ..models.user import User
+from ..core.exceptions import ForbiddenException, UnauthorizedException
+from ..core.security import decode_token, oauth2_scheme
 from ..db.session import get_async_session
+from ..models.user import User
+from ..schemas.user import UserInDB
 
 
 async def get_current_user(

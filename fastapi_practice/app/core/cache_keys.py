@@ -4,14 +4,14 @@
 def task_list_cache_key(user_id: int, status: str = None, search: str = None, page: int = 1) -> str:
     """Generate cache key for task list"""
     parts = [f"tasks:u{user_id}"]
-    
+
     if status:
         parts.append(f"s{status}")
     if search:
         parts.append(f"q{search}")
-    
+
     parts.append(f"p{page}")
-    
+
     return ":".join(parts)
 
 

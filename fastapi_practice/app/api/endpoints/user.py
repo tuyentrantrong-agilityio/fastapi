@@ -1,24 +1,24 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...db.session import get_async_session
+from ...dependencies.user import get_current_user
 from ...schemas.user import (
+    RefreshTokenRequest,
+    Token,
     UserCreate,
+    UserInDB,
     UserResponse,
     UserUpdate,
-    Token,
-    UserInDB,
-    RefreshTokenRequest,
-)
-from ...dependencies.user import get_current_user, get_admin_user
-from ...db.session import get_async_session
-from ...services.user_service import (
-    create_user_service,
-    update_user_profile_service,
 )
 from ...services.auth_service import (
     login_service,
     refresh_access_token_service,
+)
+from ...services.user_service import (
+    create_user_service,
+    update_user_profile_service,
 )
 from ...tasks.email_tasks import send_welcome_email_task
 
@@ -32,9 +32,7 @@ router = APIRouter(prefix="/users", tags=["users"])
     responses={
         400: {
             "description": "Bad Request - Email already exists",
-            "content": {
-                "application/json": {"example": {"detail": "Email already registered"}}
-            },
+            "content": {"application/json": {"example": {"detail": "Email already registered"}}},
         },
         422: {
             "description": "Validation Error - Invalid input data",
@@ -54,9 +52,7 @@ router = APIRouter(prefix="/users", tags=["users"])
         },
         500: {
             "description": "Internal Server Error",
-            "content": {
-                "application/json": {"example": {"detail": "Internal server error"}}
-            },
+            "content": {"application/json": {"example": {"detail": "Internal server error"}}},
         },
     },
 )
@@ -161,6 +157,4 @@ async def update_profile(
         Updated user profile
     """
     is_admin = current_user.role == "admin"
-    return await update_user_profile_service(
-        session, current_user.id, user_update, is_admin
-    )
+    return await update_user_profile_service(session, current_user.id, user_update, is_admin)

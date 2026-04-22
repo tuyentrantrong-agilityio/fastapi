@@ -1,30 +1,26 @@
 """Auth service - handles authentication business logic."""
 
 from datetime import datetime, timedelta
-from typing import Dict, cast
+from typing import Dict
 
-from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlmodel import select
 
+from ..core.config import settings
+from ..core.exceptions import UnauthorizedException
 from ..core.hashing import verify_password
 from ..core.security import (
     create_access_token,
     generate_refresh_token,
     hash_refresh_token,
 )
-from ..core.exceptions import UnauthorizedException
-from ..core.config import settings
 from ..models.refresh_token import RefreshToken
-from ..models.user import User
 
 # from ..db.storage import users_db, refresh_tokens_db
 from .user_service import get_user_by_email_service
 
 
-async def login_service(
-    session: AsyncSession, email: str, password: str
-) -> Dict[str, str]:
+async def login_service(session: AsyncSession, email: str, password: str) -> Dict[str, str]:
     """
     Authenticate user and generate tokens.
 
@@ -77,9 +73,7 @@ async def login_service(
     }
 
 
-async def refresh_access_token_service(
-    session: AsyncSession, refresh_token: str
-) -> Dict[str, str]:
+async def refresh_access_token_service(session: AsyncSession, refresh_token: str) -> Dict[str, str]:
     """
     Refresh access token using refresh token.
 

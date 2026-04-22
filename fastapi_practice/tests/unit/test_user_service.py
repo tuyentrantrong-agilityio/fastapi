@@ -1,26 +1,25 @@
 """Unit tests for user service functions with mocked AsyncSession."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.user_service import (
-    create_user_service,
-    get_user_by_email_service,
-    update_user_profile_service,
-)
-from app.schemas.user import UserCreate, UserUpdate
-from app.models.user import User
 from app.core.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
 )
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+from app.services.user_service import (
+    create_user_service,
+    get_user_by_email_service,
+    update_user_profile_service,
+)
 
 
-def make_user(
-    id=1, email="test@example.com", hashed_password="hash_pwd_123", role="user"
-):
+def make_user(id=1, email="test@example.com", hashed_password="hash_pwd_123", role="user"):
     """Helper to create User model instance."""
     user = User(
         id=id,
@@ -41,9 +40,7 @@ class TestCreateUserService:
         # --- Mock session and database query (no existing user with this email) ---
         session = AsyncMock(spec=AsyncSession)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            None  # Simulate: email not found
-        )
+        query_result.scalars.return_value.first.return_value = None  # Simulate: email not found
         session.execute.return_value = query_result
 
         # --- Mock DB operations (add, commit, refresh) ---
@@ -106,9 +103,7 @@ class TestGetUserByEmailService:
         session = AsyncMock(spec=AsyncSession)
         found_user = make_user(id=1, email="user@example.com")
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            found_user  # Simulate: user found
-        )
+        query_result.scalars.return_value.first.return_value = found_user  # Simulate: user found
         session.execute.return_value = query_result
 
         # --- Call the service function under test ---
@@ -126,9 +121,7 @@ class TestGetUserByEmailService:
         # --- Mock session with no user found ---
         session = AsyncMock(spec=AsyncSession)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            None  # Simulate: no user found
-        )
+        query_result.scalars.return_value.first.return_value = None  # Simulate: no user found
         session.execute.return_value = query_result
 
         # --- Call the service function under test ---
@@ -149,9 +142,7 @@ class TestUpdateUserProfileService:
         # --- Mock session and database user ---
         session = AsyncMock(spec=AsyncSession)
         existing_user = make_user(id=1, email="user@example.com", role="user")
-        session.get.return_value = (
-            existing_user  # session.get() will return our test user
-        )
+        session.get.return_value = existing_user  # session.get() will return our test user
 
         # --- Mock DB operations (add, commit, refresh) ---
         session.add = MagicMock()
@@ -161,9 +152,7 @@ class TestUpdateUserProfileService:
         # --- Mock check for duplicate email (simulate no other user with same email) ---
         mock_execute_result = MagicMock()
         mock_scalars = MagicMock()
-        mock_scalars.first.return_value = (
-            None  # Simulate: no user found with this email
-        )
+        mock_scalars.first.return_value = None  # Simulate: no user found with this email
         mock_execute_result.scalars.return_value = mock_scalars
         session.execute.return_value = mock_execute_result
 
@@ -171,9 +160,7 @@ class TestUpdateUserProfileService:
         user_update = UserUpdate(email="newemail@example.com")
 
         # --- Call the service function under test ---
-        result = await update_user_profile_service(
-            session, 1, user_update, is_admin=False
-        )
+        result = await update_user_profile_service(session, 1, user_update, is_admin=False)
 
         # --- Assert correct behavior and DB calls ---
         session.get.assert_awaited_once_with(User, 1)
@@ -198,9 +185,7 @@ class TestUpdateUserProfileService:
             await update_user_profile_service(session, 999, user_update, is_admin=False)
 
         # --- Assert service attempted to fetch user ---
-        session.get.assert_awaited_once_with(
-            User, 999
-        )  # Lookup attempted for user ID 999
+        session.get.assert_awaited_once_with(User, 999)  # Lookup attempted for user ID 999
 
     @pytest.mark.asyncio
     async def test_duplicate_email(self):
@@ -214,9 +199,7 @@ class TestUpdateUserProfileService:
         # --- Mock query showing another user already has the target email ---
         other_user = make_user(id=2, email="taken@example.com")
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            other_user  # Simulate: email taken
-        )
+        query_result.scalars.return_value.first.return_value = other_user  # Simulate: email taken
         session.execute.return_value = query_result
 
         # --- Prepare input DTO with duplicate email ---
@@ -244,9 +227,7 @@ class TestUpdateUserProfileService:
         user_update = UserUpdate(role="admin")
 
         # --- Call the service function with admin=True ---
-        result = await update_user_profile_service(
-            session, 1, user_update, is_admin=True
-        )
+        result = await update_user_profile_service(session, 1, user_update, is_admin=True)
 
         # --- Assert role was successfully updated ---
         assert result.role == "admin"  # Role changed
@@ -265,7 +246,5 @@ class TestUpdateUserProfileService:
         user_update = UserUpdate(role="admin")
 
         # --- Call with is_admin=False and verify exception is raised ---
-        with pytest.raises(
-            ForbiddenException, match="Only admin users can change roles"
-        ):
+        with pytest.raises(ForbiddenException, match="Only admin users can change roles"):
             await update_user_profile_service(session, 1, user_update, is_admin=False)

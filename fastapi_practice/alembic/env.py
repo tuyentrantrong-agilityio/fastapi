@@ -1,15 +1,14 @@
-import sys
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from alembic import context
+from app.core.config import settings
 
 # Import SQLModel models for Alembic to detect all tables
 from app.db.base import SQLModel
-from app.models import User, Task, Project, RefreshToken
-from app.core.config import settings
 
 # Alembic Config object
 config = context.config
@@ -68,9 +67,7 @@ def do_run_migrations(connection):
 
 async def run_migrations_online_async():
     """Run Alembic migrations in 'online' mode using async engine."""
-    connectable = create_async_engine(
-        settings.DATABASE_URL, poolclass=pool.NullPool, echo=False
-    )
+    connectable = create_async_engine(settings.DATABASE_URL, poolclass=pool.NullPool, echo=False)
     async with connectable.begin() as conn:
         await conn.run_sync(do_run_migrations)
     await connectable.dispose()

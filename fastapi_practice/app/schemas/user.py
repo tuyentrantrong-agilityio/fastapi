@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserCreate(BaseModel):
@@ -10,9 +11,7 @@ class UserCreate(BaseModel):
     )
 
     email: EmailStr
-    password: str = Field(
-        ..., min_length=8, description="Password must be at least 8 characters"
-    )
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
 
 
 class UserResponse(BaseModel):
@@ -20,9 +19,7 @@ class UserResponse(BaseModel):
     # and automatically map their attributes to schema fields
     model_config = ConfigDict(
         from_attributes=True,
-        json_schema_extra={
-            "example": {"id": 1, "email": "tuyen@example.com", "role": "user"}
-        },
+        json_schema_extra={"example": {"id": 1, "email": "tuyen@example.com", "role": "user"}},
     )
 
     id: int

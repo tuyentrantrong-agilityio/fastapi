@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreate(BaseModel):
@@ -16,9 +17,7 @@ class ProjectCreate(BaseModel):
     )
 
     name: str = Field(..., min_length=1, max_length=200, description="Project name")
-    description: Optional[str] = Field(
-        None, max_length=2000, description="Project description"
-    )
+    description: Optional[str] = Field(None, max_length=2000, description="Project description")
 
 
 class ProjectUpdate(BaseModel):

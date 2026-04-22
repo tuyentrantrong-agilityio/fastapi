@@ -5,18 +5,19 @@
 - Support status tracking: todo -> in_progress -> done
 """
 
-import logging
 import asyncio
+import logging
 import random
 import time
-import os
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-from .celery_app import celery_app
-from ..models.task import Task
+
 from ..core.config import settings
+from ..models.task import Task
+from .celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +96,7 @@ def run_async(coro):
             loop.close()
 
 
-@celery_app.task(
-    bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=5
-)
+@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=5)
 def process_task_async(self, task_id: int):
     """
     Celery task: Process task asynchronously.
@@ -137,9 +136,7 @@ def process_task_async(self, task_id: int):
         result = run_async(_update_task_status(task_id, "done"))
 
         duration = time.time() - start_time
-        logger.info(
-            f"[SUCCESS] id={task_cid} task_id={task_id} duration={duration:.2f}s"
-        )
+        logger.info(f"[SUCCESS] id={task_cid} task_id={task_id} duration={duration:.2f}s")
         return result
 
     except Exception as exc:

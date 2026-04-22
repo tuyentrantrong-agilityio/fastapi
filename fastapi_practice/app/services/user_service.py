@@ -1,12 +1,12 @@
 """User service - handles user business logic."""
 
-from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
-from ..schemas.user import UserCreate, UserUpdate
-from ..core.hashing import hash_password
 from ..core.exceptions import BadRequestException, ForbiddenException, NotFoundException
+from ..core.hashing import hash_password
 from ..models.user import User
+from ..schemas.user import UserCreate, UserUpdate
 
 
 async def create_user_service(session: AsyncSession, user: UserCreate) -> User:
@@ -83,9 +83,7 @@ async def update_user_profile_service(
 
     # Update email if provided
     if user_update.email is not None and user_update.email != user.email:
-        statement = select(User).where(
-            (User.email == user_update.email) & (User.id != user_id)
-        )
+        statement = select(User).where((User.email == user_update.email) & (User.id != user_id))
         result = await session.execute(statement)
         if result.scalars().first():
             raise BadRequestException("Email already taken")

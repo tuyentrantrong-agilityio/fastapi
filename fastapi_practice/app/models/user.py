@@ -1,10 +1,11 @@
-from typing import Optional, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from app.models.task import Task
     from app.models.refresh_token import RefreshToken
+    from app.models.task import Task
 
 
 class User(SQLModel, table=True):

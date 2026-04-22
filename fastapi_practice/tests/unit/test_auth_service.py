@@ -1,14 +1,15 @@
 """Unit tests for auth service functions with mocked AsyncSession."""
 
-import pytest
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone, timedelta
 
-from app.services.auth_service import login_service, refresh_access_token_service
-from app.models.user import User
-from app.models.refresh_token import RefreshToken
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.exceptions import UnauthorizedException
+from app.models.refresh_token import RefreshToken
+from app.models.user import User
+from app.services.auth_service import login_service, refresh_access_token_service
 
 
 def make_user(id=1, email="user@test.com", hashed_password="hash_pwd_123", role="user"):
@@ -103,9 +104,7 @@ class TestLoginService:
             mock_get_user.return_value = None  # Simulate: user not found
 
             # --- Call and verify exception is raised ---
-            with pytest.raises(
-                UnauthorizedException, match="Invalid email or password"
-            ):
+            with pytest.raises(UnauthorizedException, match="Invalid email or password"):
                 await login_service(session, "nonexistent@test.com", "password123")
 
             # --- Assert user lookup was attempted ---
@@ -131,9 +130,7 @@ class TestLoginService:
             mock_get_user.return_value = user  # User found
 
             # --- Call and verify exception is raised ---
-            with pytest.raises(
-                UnauthorizedException, match="Invalid email or password"
-            ):
+            with pytest.raises(UnauthorizedException, match="Invalid email or password"):
                 await login_service(session, "user@test.com", "wrongpassword")
 
             # --- Assert user lookup was attempted before password check ---
@@ -197,17 +194,13 @@ class TestRefreshAccessTokenService:
         # --- Mock token lookup query (find existing refresh token) ---
         query_result = MagicMock()
         session.execute.return_value = query_result
-        query_result.scalars.return_value.first.return_value = (
-            old_token  # Simulate: token found
-        )
+        query_result.scalars.return_value.first.return_value = old_token  # Simulate: token found
         session.delete = AsyncMock()
         session.commit = AsyncMock()
 
         # --- Mock cryptography and token generation ---
         with (
-            patch(
-                "app.services.auth_service.hash_refresh_token", return_value="old_hash"
-            ),
+            patch("app.services.auth_service.hash_refresh_token", return_value="old_hash"),
             patch(
                 "app.services.auth_service.create_access_token",
                 return_value="new_access_token",
@@ -236,18 +229,12 @@ class TestRefreshAccessTokenService:
         session = AsyncMock(spec=AsyncSession)
         query_result = MagicMock()
         session.execute.return_value = query_result
-        query_result.scalars.return_value.first.return_value = (
-            None  # Simulate: token not found
-        )
+        query_result.scalars.return_value.first.return_value = None  # Simulate: token not found
 
         # --- Mock token hashing (invalid result) ---
-        with patch(
-            "app.services.auth_service.hash_refresh_token", return_value="invalid_hash"
-        ):
+        with patch("app.services.auth_service.hash_refresh_token", return_value="invalid_hash"):
             # --- Call and verify exception is raised ---
-            with pytest.raises(
-                UnauthorizedException, match="Invalid or expired refresh token"
-            ):
+            with pytest.raises(UnauthorizedException, match="Invalid or expired refresh token"):
                 await refresh_access_token_service(session, "invalid_token")
 
     @pytest.mark.asyncio
@@ -275,13 +262,9 @@ class TestRefreshAccessTokenService:
         session.commit = AsyncMock()
 
         # --- Mock token hashing ---
-        with patch(
-            "app.services.auth_service.hash_refresh_token", return_value="expired_hash"
-        ):
+        with patch("app.services.auth_service.hash_refresh_token", return_value="expired_hash"):
             # --- Call and verify exception is raised ---
-            with pytest.raises(
-                UnauthorizedException, match="Refresh token has expired"
-            ):
+            with pytest.raises(UnauthorizedException, match="Refresh token has expired"):
                 await refresh_access_token_service(session, "expired_token")
 
     @pytest.mark.asyncio
@@ -301,9 +284,7 @@ class TestRefreshAccessTokenService:
         session.execute.return_value = query_result
 
         # --- Mock token hashing ---
-        with patch(
-            "app.services.auth_service.hash_refresh_token", return_value="token_hash"
-        ):
+        with patch("app.services.auth_service.hash_refresh_token", return_value="token_hash"):
             # --- Call and verify exception is raised ---
             with pytest.raises(UnauthorizedException, match="User not found"):
                 await refresh_access_token_service(session, "valid_token")

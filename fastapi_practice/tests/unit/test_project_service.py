@@ -1,19 +1,19 @@
 """Unit tests for project service functions with mocked AsyncSession."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone
 
-from app.services.project_service import (
-    create_project_service,
-    get_user_projects_service,
-    assign_task_to_project_service,
-)
-from app.schemas.project import ProjectCreate
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import ForbiddenException, NotFoundException
 from app.models.project import Project
 from app.models.task import Task
-from app.core.exceptions import NotFoundException, ForbiddenException
+from app.schemas.project import ProjectCreate
+from app.services.project_service import (
+    assign_task_to_project_service,
+    create_project_service,
+    get_user_projects_service,
+)
 
 
 def make_project(id=1, user_id=1, name="Project", description=None):
@@ -53,9 +53,7 @@ class TestCreateProjectService:
         session.refresh = AsyncMock()
 
         # --- Prepare input DTO ---
-        project_create = ProjectCreate(
-            name="New Project", description="Project Description"
-        )
+        project_create = ProjectCreate(name="New Project", description="Project Description")
 
         # --- Mock DB refresh to assign ID ---
         def side_effect_refresh(proj):
@@ -153,9 +151,7 @@ class TestGetUserProjectsService:
 
         # --- Mock query to return only user 2's project ---
         query_result = MagicMock()
-        query_result.scalars.return_value.all.return_value = [
-            project2
-        ]  # Only project2 for user 2
+        query_result.scalars.return_value.all.return_value = [project2]  # Only project2 for user 2
         session.execute.return_value = query_result
 
         # --- Call the service for user 2 ---
@@ -194,9 +190,7 @@ class TestAssignTaskToProjectService:
         session.refresh = AsyncMock()
 
         # --- Call the service function under test ---
-        result = await assign_task_to_project_service(
-            session, project_id=1, task_id=1, user_id=1
-        )
+        result = await assign_task_to_project_service(session, project_id=1, task_id=1, user_id=1)
 
         # --- Assert task assigned to project ---
         assert result.project_id == 1  # Task now belongs to project
@@ -216,9 +210,7 @@ class TestAssignTaskToProjectService:
 
         # --- Call and verify exception is raised ---
         with pytest.raises(NotFoundException):
-            await assign_task_to_project_service(
-                session, project_id=999, task_id=1, user_id=1
-            )
+            await assign_task_to_project_service(session, project_id=999, task_id=1, user_id=1)
 
     @pytest.mark.asyncio
     async def test_task_not_found(self):
@@ -234,18 +226,14 @@ class TestAssignTaskToProjectService:
 
         # --- Mock task lookup (not found) ---
         task_query = MagicMock()
-        task_query.scalars.return_value.first.return_value = (
-            None  # Simulate: task doesn't exist
-        )
+        task_query.scalars.return_value.first.return_value = None  # Simulate: task doesn't exist
 
         # --- Mock session to return project query first, then task query ---
         session.execute.side_effect = [project_query, task_query]
 
         # --- Call and verify exception is raised ---
         with pytest.raises(NotFoundException):
-            await assign_task_to_project_service(
-                session, project_id=1, task_id=999, user_id=1
-            )
+            await assign_task_to_project_service(session, project_id=1, task_id=999, user_id=1)
 
     @pytest.mark.asyncio
     async def test_user_not_own_project(self):

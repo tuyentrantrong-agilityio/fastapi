@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskStatus(str, Enum):
@@ -26,9 +27,7 @@ class TaskCreate(BaseModel):
     )
 
     title: str = Field(..., min_length=1, max_length=200, description="Task title")
-    description: Optional[str] = Field(
-        None, max_length=2000, description="Task description"
-    )
+    description: Optional[str] = Field(None, max_length=2000, description="Task description")
     status: TaskStatus = Field(default=TaskStatus.TODO, description="Task status")
 
 

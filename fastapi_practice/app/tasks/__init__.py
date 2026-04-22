@@ -12,8 +12,8 @@ Phase 2: Celery + Redis
 """
 
 from .email_tasks import (
-    send_welcome_email_task,
     send_task_assigned_email_task,
+    send_welcome_email_task,
 )
 from .task_tasks import (
     process_task_async,

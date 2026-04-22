@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SortDirection(str, Enum):
@@ -33,9 +34,7 @@ class TaskFilterParams(BaseModel):
         SortDirection.DESC, description="Sort direction: asc or desc"
     )
     page: Optional[int] = Field(1, ge=1, description="Page number (1-based)")
-    limit: Optional[int] = Field(
-        10, ge=1, le=100, description="Items per page (max 100)"
-    )
+    limit: Optional[int] = Field(10, ge=1, le=100, description="Items per page (max 100)")
 
     @field_validator("status")
     def validate_status(cls, v):
@@ -55,9 +54,7 @@ class TaskFilterParams(BaseModel):
     def validate_sort_by(cls, v):
         valid_fields = ["created_at", "title", "status", "updated_at"]
         if v not in valid_fields:
-            raise ValueError(
-                f"Invalid sort_by '{v}'. Must be one of: {', '.join(valid_fields)}"
-            )
+            raise ValueError(f"Invalid sort_by '{v}'. Must be one of: {', '.join(valid_fields)}")
         return v
 
     @field_validator("search_fields")

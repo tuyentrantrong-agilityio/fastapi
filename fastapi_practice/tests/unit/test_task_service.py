@@ -1,24 +1,22 @@
 """Unit tests for task service functions with mocked AsyncSession."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import BadRequestException, NotFoundException
+from app.models.task import Task
+from app.schemas.task import TaskCreate, TaskStatus, TaskUpdate
 from app.services.task_service import (
     create_task_service,
-    update_task_service,
     delete_task_service,
     get_user_tasks_filtered_service,
+    update_task_service,
 )
-from app.schemas.task import TaskCreate, TaskUpdate, TaskStatus
-from app.models.task import Task
-from app.core.exceptions import NotFoundException, BadRequestException
 
 
-def make_task(
-    id=1, user_id=1, title="Task", description=None, status="todo", project_id=None
-):
+def make_task(id=1, user_id=1, title="Task", description=None, status="todo", project_id=None):
     """Helper to create Task model instance."""
     task = Task(
         id=id,
@@ -100,9 +98,7 @@ class TestUpdateTaskService:
         session = AsyncMock(spec=AsyncSession)
         existing = make_task(id=7, title="Old", status="todo", user_id=42)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            existing  # Simulate: task found
-        )
+        query_result.scalars.return_value.first.return_value = existing  # Simulate: task found
         session.execute.return_value = query_result
 
         # --- Mock DB operations ---
@@ -130,16 +126,12 @@ class TestUpdateTaskService:
         # --- Mock session with no task found ---
         session = AsyncMock(spec=AsyncSession)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            None  # Simulate: task doesn't exist
-        )
+        query_result.scalars.return_value.first.return_value = None  # Simulate: task doesn't exist
         session.execute.return_value = query_result
 
         # --- Call and verify exception is raised ---
         with pytest.raises(NotFoundException):
-            await update_task_service(
-                session, task_id=99, task_update=TaskUpdate(title="X")
-            )
+            await update_task_service(session, task_id=99, task_update=TaskUpdate(title="X"))
 
     @pytest.mark.asyncio
     async def test_partial(self):
@@ -147,9 +139,7 @@ class TestUpdateTaskService:
 
         # --- Mock session and existing task ---
         session = AsyncMock(spec=AsyncSession)
-        existing = make_task(
-            id=5, title="Original", description="Original desc", status="todo"
-        )
+        existing = make_task(id=5, title="Original", description="Original desc", status="todo")
         query_result = MagicMock()
         query_result.scalars.return_value.first.return_value = existing
         session.execute.return_value = query_result
@@ -182,9 +172,7 @@ class TestDeleteTaskService:
         session = AsyncMock(spec=AsyncSession)
         existing = make_task(id=10, title="ToDelete", user_id=42)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            existing  # Simulate: task found
-        )
+        query_result.scalars.return_value.first.return_value = existing  # Simulate: task found
         session.execute.return_value = query_result
 
         # --- Mock DB delete operations ---
@@ -207,9 +195,7 @@ class TestDeleteTaskService:
         # --- Mock session with no task found ---
         session = AsyncMock(spec=AsyncSession)
         query_result = MagicMock()
-        query_result.scalars.return_value.first.return_value = (
-            None  # Simulate: task doesn't exist
-        )
+        query_result.scalars.return_value.first.return_value = None  # Simulate: task doesn't exist
         session.execute.return_value = query_result
 
         # --- Call and verify exception is raised ---
@@ -297,9 +283,7 @@ class TestGetUserTasksFilteredService:
         session.execute.side_effect = [count_query_result, items_query_result]
 
         # --- Call the service with status filter ---
-        result = await get_user_tasks_filtered_service(
-            session, user_id=42, status_filter="todo"
-        )
+        result = await get_user_tasks_filtered_service(session, user_id=42, status_filter="todo")
 
         # --- Assert only matching tasks returned ---
         assert len(result["data"]) == 1  # Only 1 task after filter
@@ -327,9 +311,7 @@ class TestGetUserTasksFilteredService:
         session.execute.side_effect = [count_query_result, items_query_result]
 
         # --- Call the service with pagination params (page=1, limit=5) ---
-        result = await get_user_tasks_filtered_service(
-            session, user_id=42, page=1, limit=5
-        )
+        result = await get_user_tasks_filtered_service(session, user_id=42, page=1, limit=5)
 
         # --- Assert pagination metadata correct ---
         assert len(result["data"]) == 5  # 5 items on this page
@@ -346,9 +328,7 @@ class TestGetUserTasksFilteredService:
         session = AsyncMock(spec=AsyncSession)
 
         # --- Create task matching search keyword ---
-        task = make_task(
-            id=1, user_id=42, title="Learn FastAPI", description="Complete tutorial"
-        )
+        task = make_task(id=1, user_id=42, title="Learn FastAPI", description="Complete tutorial")
 
         # --- Mock count query (1 task matches search) ---
         count_query_result = MagicMock()
@@ -362,9 +342,7 @@ class TestGetUserTasksFilteredService:
         session.execute.side_effect = [count_query_result, items_query_result]
 
         # --- Call the service with search parameter ---
-        result = await get_user_tasks_filtered_service(
-            session, user_id=42, search="FastAPI"
-        )
+        result = await get_user_tasks_filtered_service(session, user_id=42, search="FastAPI")
 
         # --- Assert search results correct ---
         assert len(result["data"]) == 1  # Only matching task returned

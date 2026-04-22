@@ -8,9 +8,9 @@ Tests cover:
 - Task naming consistency
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 # Celery task name constants (avoid hardcoding)
 CELERY_TASK_NAMES = {
@@ -36,9 +36,7 @@ async def test_process_task_celery_queuing(async_session, test_user, test_task):
 
         # For now, since we don't have a process_task_service, just verify
         # that Celery task can be called
-        result = await celery_app.send_task(
-            CELERY_TASK_NAMES["process_task"], args=[test_task.id]
-        )
+        result = await celery_app.send_task(CELERY_TASK_NAMES["process_task"], args=[test_task.id])
 
         assert result.id == "celery-task-uuid-123"
         mock_send.assert_called_once()
@@ -59,9 +57,7 @@ async def test_celery_task_args_verification(async_session, test_task):
         mock_send.return_value = MagicMock(id="celery-task-uuid")
 
         # Queue the task
-        await celery_app.send_task(
-            CELERY_TASK_NAMES["process_task"], args=[test_task.id]
-        )
+        await celery_app.send_task(CELERY_TASK_NAMES["process_task"], args=[test_task.id])
 
         # Verify arguments
         mock_send.assert_called_once()
@@ -88,14 +84,10 @@ async def test_celery_task_idempotency(async_session, test_task):
         mock_send.return_value = MagicMock(id="celery-task-uuid-same")
 
         # First queue
-        result1 = await celery_app.send_task(
-            CELERY_TASK_NAMES["process_task"], args=[test_task.id]
-        )
+        result1 = await celery_app.send_task(CELERY_TASK_NAMES["process_task"], args=[test_task.id])
 
         # Second queue (same task_id)
-        result2 = await celery_app.send_task(
-            CELERY_TASK_NAMES["process_task"], args=[test_task.id]
-        )
+        result2 = await celery_app.send_task(CELERY_TASK_NAMES["process_task"], args=[test_task.id])
 
         # In production, service layer should prevent duplicate queuing
         # Here we just verify both calls would happen

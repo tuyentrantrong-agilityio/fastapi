@@ -1,14 +1,12 @@
 from fastapi import Depends
-from typing import Dict, Any
-
-from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
-from ..schemas.user import UserInDB
-from ..core.exceptions import NotFoundException, ForbiddenException
+from ..core.exceptions import ForbiddenException, NotFoundException
+from ..db.session import get_async_session
 from ..dependencies.user import get_current_user
 from ..models.task import Task
-from ..db.session import get_async_session
+from ..schemas.user import UserInDB
 
 
 async def get_owned_task_or_error(

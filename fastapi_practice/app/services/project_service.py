@@ -3,10 +3,10 @@
 from datetime import datetime
 from typing import List
 
-from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
-from ..core.exceptions import NotFoundException, ForbiddenException
+from ..core.exceptions import ForbiddenException, NotFoundException
 from ..models.project import Project
 from ..models.task import Task
 from ..schemas.project import ProjectCreate
@@ -36,9 +36,7 @@ async def create_project_service(
     return new_project
 
 
-async def get_user_projects_service(
-    session: AsyncSession, user_id: int
-) -> List[Project]:
+async def get_user_projects_service(session: AsyncSession, user_id: int) -> List[Project]:
     """
     Get all projects for a user.
 

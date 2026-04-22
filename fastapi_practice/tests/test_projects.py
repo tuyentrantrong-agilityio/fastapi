@@ -126,9 +126,7 @@ class TestGetProjects:
         projects = response.json()
         assert len(projects) == 3
 
-    def test_get_projects_user_isolation(
-        self, client, auth_headers, auth_headers_user_2
-    ):
+    def test_get_projects_user_isolation(self, client, auth_headers, auth_headers_user_2):
         """Test that users only see their own projects"""
         # User 1 creates projects
         client.post(
@@ -197,9 +195,7 @@ class TestAssignTaskToProject:
 
         assert response.status_code in [404, 422]
 
-    def test_assign_to_nonexistent_project(
-        self, client, auth_headers, create_test_task
-    ):
+    def test_assign_to_nonexistent_project(self, client, auth_headers, create_test_task):
         """Test assigning task to non-existent project"""
         fake_project_id = "nonexistent_project"
         task_id = create_test_task["id"]
@@ -211,9 +207,7 @@ class TestAssignTaskToProject:
 
         assert response.status_code in [404, 422]
 
-    def test_assign_task_unauthorized(
-        self, client, create_test_project, create_test_task
-    ):
+    def test_assign_task_unauthorized(self, client, create_test_project, create_test_task):
         """Test assigning task without authorization"""
         project_id = create_test_project["id"]
         task_id = create_test_task["id"]
@@ -242,9 +236,7 @@ class TestAssignTaskToProject:
         # Should be forbidden - user 2 doesn't own the project
         assert response.status_code in [403, 404]
 
-    def test_assign_task_to_other_user_project(
-        self, client, auth_headers, auth_headers_user_2
-    ):
+    def test_assign_task_to_other_user_project(self, client, auth_headers, auth_headers_user_2):
         """Test user 2 assigning task to user 1's project"""
         # User 1 creates project and task
         project_response = client.post(
@@ -292,9 +284,7 @@ class TestAssignTaskToProject:
             )
             assert response.status_code == 200
 
-    def test_assign_task_twice(
-        self, client, auth_headers, create_test_project, create_test_task
-    ):
+    def test_assign_task_twice(self, client, auth_headers, create_test_project, create_test_task):
         """Test assigning same task twice"""
         project_id = create_test_project["id"]
         task_id = create_test_task["id"]

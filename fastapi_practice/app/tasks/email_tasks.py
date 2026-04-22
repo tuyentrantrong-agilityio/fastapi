@@ -7,16 +7,17 @@ Phase 2: Celery + Redis (with async-native Celery tasks)
   - Native async support (no nested event loop issues)
 """
 
-import logging
-import random
 import asyncio
 import concurrent.futures
+import logging
+import random
 import time
-import os
+
 from redis.asyncio import from_url
-from .celery_app import celery_app
-from ..services.email_service import email_service
+
 from ..core.config import settings
+from ..services.email_service import email_service
+from .celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,7 @@ async def _should_simulate_failure() -> bool:
     2. Fall back to .env FAKE_EMAIL_FAILURE
     """
     try:
-        redis = await from_url(
-            settings.REDIS_URL, encoding="utf8", decode_responses=True
-        )
+        redis = await from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
         redis_value = await redis.get("test:fake_email_failure")
         await redis.close()
 
@@ -78,18 +77,14 @@ async def _should_simulate_failure() -> bool:
     return settings.FAKE_EMAIL_FAILURE
 
 
-async def _send_welcome_email(
-    email: str, user_name: str = "User", retry_count: int = 0
-):
+async def _send_welcome_email(email: str, user_name: str = "User", retry_count: int = 0):
     """Internal: Send welcome email (async)"""
 
     # TEST: Fake failure to test retry mechanism
     if settings.TEST_MODE:
         should_fail = await _should_simulate_failure()
         if should_fail and random.random() < settings.FAKE_FAILURE_RATE:
-            logger.info(
-                f"[TEST-FAIL] Simulating failure for {email} (attempt #{retry_count + 1})"
-            )
+            logger.info(f"[TEST-FAIL] Simulating failure for {email} (attempt #{retry_count + 1})")
             raise Exception(f"[FAKE] Simulated failure (attempt #{retry_count + 1})")
 
     subject = "Welcome to FastAPI Practice!"
@@ -140,7 +135,7 @@ async def _send_task_assigned_email(
     retry_count: int = 0,
 ):
     """Internal: Send task assignment notification email (async)"""
-    logger.info(f"[CELERY-TASK] send_task_assigned_email_task STARTED")
+    logger.info("[CELERY-TASK] send_task_assigned_email_task STARTED")
     logger.debug(
         f"  Email: {email}, Task: {task_title} (ID: {task_id}), Assigned by: {assigned_by}, Retry: {retry_count}"
     )
@@ -201,9 +196,7 @@ FastAPI Practice Team
 
 # Celery async tasks (using newly added async support)
 # These get converted to sync tasks but internally support awaiting async functions
-@celery_app.task(
-    bind=True, autoretry_for=(Exception,), max_retries=3, default_retry_delay=5
-)
+@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def send_welcome_email_task(self, email: str, user_name: str = "User"):
     """Send welcome email after user registration - Celery task."""
     start_time = time.time()
@@ -217,9 +210,7 @@ def send_welcome_email_task(self, email: str, user_name: str = "User"):
         sleep_time = 3 if retry_count == 0 else 2
         time.sleep(sleep_time)
 
-        result = run_async(
-            _send_welcome_email(email, user_name, retry_count=retry_count)
-        )
+        result = run_async(_send_welcome_email(email, user_name, retry_count=retry_count))
 
         duration = time.time() - start_time
         logger.info(f"[SUCCESS] id={task_id} email={email} duration={duration:.2f}s")
@@ -231,9 +222,7 @@ def send_welcome_email_task(self, email: str, user_name: str = "User"):
         raise self.retry(exc=exc, countdown=5)
 
 
-@celery_app.task(
-    bind=True, autoretry_for=(Exception,), max_retries=3, default_retry_delay=5
-)
+@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def send_task_assigned_email_task(
     self,
     email: str,
@@ -266,9 +255,7 @@ def send_task_assigned_email_task(
         )
 
         duration = time.time() - start_time
-        logger.info(
-            f"[SUCCESS] id={celery_task_id} email={email} duration={duration:.2f}s"
-        )
+        logger.info(f"[SUCCESS] id={celery_task_id} email={email} duration={duration:.2f}s")
         return result
     except Exception as exc:
         duration = time.time() - start_time

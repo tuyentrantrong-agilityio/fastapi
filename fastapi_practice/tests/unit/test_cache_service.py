@@ -8,8 +8,9 @@ Tests cover:
 - Cache key generation
 """
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.unit
@@ -45,8 +46,9 @@ async def test_cache_get_hit():
     - Redis returns cached JSON value
     - Expected: Cached value returned
     """
-    from app.services.cache_service import CacheService
     import json
+
+    from app.services.cache_service import CacheService
 
     # Mock Redis connection
     mock_redis = AsyncMock()
@@ -71,8 +73,8 @@ async def test_cache_set_with_ttl():
     - Set a cache value with 300 second TTL
     - Expected: Redis setex() called with correct TTL
     """
+
     from app.services.cache_service import CacheService
-    import json
 
     # Mock Redis connection
     mock_redis = AsyncMock()
@@ -239,8 +241,9 @@ async def test_cache_get_hit():
     - Redis returns cached JSON value
     - Expected: Cached value returned
     """
-    from app.services.cache_service import CacheService
     import json
+
+    from app.services.cache_service import CacheService
 
     # Mock Redis connection
     mock_redis = AsyncMock()
@@ -264,8 +267,8 @@ async def test_cache_set_with_ttl():
     - Set a cache value with 300 second TTL
     - Expected: Redis setex() called with correct TTL
     """
+
     from app.services.cache_service import CacheService
-    import json
 
     # Mock Redis connection
     mock_redis = AsyncMock()

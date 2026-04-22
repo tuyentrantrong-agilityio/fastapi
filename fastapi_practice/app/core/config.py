@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,9 +12,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://postgres:tuyen01233164210@localhost:5432/appdb"
-    )
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:tuyen01233164210@localhost:5432/appdb"
     POSTGRES_PASSWORD: Optional[str] = None  # Docker-only, not used by app
 
     # Email Configuration (Phase 1: BackgroundTasks)
