@@ -10,10 +10,9 @@ import logging
 import random
 import time
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
+from sqlmodel import select
 
 from ..core.config import settings
 from ..models.task import Task
@@ -28,7 +27,7 @@ celery_engine = create_async_engine(
     echo=False,
     poolclass=NullPool,
 )
-celery_async_session = sessionmaker(
+celery_async_session = async_sessionmaker(
     celery_engine,
     class_=AsyncSession,
     expire_on_commit=False,
