@@ -1,6 +1,6 @@
 """Auth service - handles authentication business logic."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,7 +60,7 @@ async def login_service(session: AsyncSession, email: str, password: str) -> Dic
         # user cast to int, dont check condition user_data.id is None
         # user_id=cast(int, user_data.id),
         token_hash=token_hash,
-        expires_at=datetime.now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     session.add(refresh_tokens)
     await session.commit()
@@ -107,7 +107,7 @@ async def refresh_access_token_service(session: AsyncSession, refresh_token: str
         raise UnauthorizedException("Invalid or expired refresh token")
     expires_at = token_data.expires_at
     # Check if token has expired
-    if datetime.now() > expires_at:
+    if datetime.now(timezone.utc) > expires_at:
         # Persist deleted token
         await session.delete(token_data)
         # TODO: For audit trail, mark as revoked instead of delete:
@@ -138,7 +138,7 @@ async def refresh_access_token_service(session: AsyncSession, refresh_token: str
     new_refresh_token_record = RefreshToken(
         user_id=user_id,
         token_hash=new_token_hash,
-        expires_at=datetime.now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
 
     # Revoke old refresh token and create new one in single transaction

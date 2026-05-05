@@ -1,6 +1,6 @@
 """Project service - handles project business logic."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,7 +94,7 @@ async def assign_task_to_project_service(
 
     # Assign task to project with updated timestamp
     task.project_id = project_id
-    task.updated_at = datetime.now()
+    task.updated_at = datetime.now(timezone.utc)
     session.add(task)
     await session.commit()
     await session.refresh(task)

@@ -1,7 +1,7 @@
 """Task service - handles task business logic."""
 
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import func, or_
@@ -185,7 +185,7 @@ async def update_task_service(session: AsyncSession, task_id: int, task_update: 
         setattr(task, key, value)
 
     # Update timestamp and persist changes
-    task.updated_at = datetime.now()
+    task.updated_at = datetime.now(timezone.utc)
     session.add(task)
     await session.commit()
     await session.refresh(task)
