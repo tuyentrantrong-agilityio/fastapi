@@ -18,13 +18,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Optimize Docker layer caching by separating dependencies
-# Copy only pyproject.toml and README.md first
-COPY pyproject.toml README.md ./
+# Copy requirements.txt and pyproject.toml first
+COPY requirements.txt pyproject.toml README.md ./
 
 # Create a dummy app directory so setuptools doesn't fail building the wheel
 RUN mkdir app && touch app/__init__.py
 
-# Install dependencies using pip
+# Install dependencies from requirements.txt (includes all needed packages)
+RUN pip install -r requirements.txt
+
+# Install project dependencies from pyproject.toml
 RUN pip install .
 
 # Now copy the actual application code
