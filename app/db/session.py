@@ -5,10 +5,14 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
-# Ensure DATABASE_URL has +asyncpg driver (Railway may not include it)
-database_url = settings.DATABASE_URL
-if database_url and "postgresql://" in database_url and "+asyncpg" not in database_url:
+# Parse DATABASE_URL and ALWAYS ensure +asyncpg driver
+database_url = settings.DATABASE_URL or "postgresql+asyncpg://postgres:password@localhost:5432/appdb"
+
+# Convert postgresql:// to postgresql+asyncpg://
+if "postgresql://" in database_url and "+asyncpg" not in database_url:
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
+
+print(f"[DEBUG] Using DATABASE_URL: {database_url[:50]}...")  # Log for debugging
 
 # Create async engine with PostgreSQL
 engine = create_async_engine(
