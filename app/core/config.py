@@ -1,5 +1,6 @@
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,14 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/appdb"
     POSTGRES_PASSWORD: Optional[str] = None  # Docker-only, not used by app
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Ensure DATABASE_URL uses asyncpg driver for async support."""
+        if v and "postgresql://" in v and "+asyncpg" not in v:
+            v = v.replace("postgresql://", "postgresql+asyncpg://")
+        return v
 
     # Email Configuration (Phase 1: BackgroundTasks)
     SMTP_HOST: str = "smtp.gmail.com"  # or your SMTP provider
