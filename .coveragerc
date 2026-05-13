@@ -1,0 +1,27 @@
+[run]
+branch = True
+omit =
+    */tests/*
+    */venv/*
+    */__pycache__/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abstract
+
+# Exclude test routes (internal development endpoints) and non-critical infrastructure
+omit =
+    app/api/test_routes.py
+    app/core/logging_config.py
+    app/middleware/logging_middleware.py
+    app/api/endpoints/websocket.py
+
+[html]
+directory = htmlcov
