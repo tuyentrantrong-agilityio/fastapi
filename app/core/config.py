@@ -5,14 +5,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Core
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = "your-secret-key-change-in-production"  # Set in .env or Railway Variables
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
     DEBUG: bool = False
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:tuyen01233164210@localhost:5432/appdb"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/appdb"
     POSTGRES_PASSWORD: Optional[str] = None  # Docker-only, not used by app
 
     # Email Configuration (Phase 1: BackgroundTasks)

@@ -34,4 +34,5 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the FastAPI application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Railway sets PORT env var automatically, fallback to 8000 for local development
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
