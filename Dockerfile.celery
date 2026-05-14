@@ -1,25 +1,53 @@
-# Celery Worker Dockerfile
-# Runs background tasks via Celery + Redis broker
+# syntax=docker/dockerfile:1
+# Docker configuration for Celery worker and beat scheduler
 
-FROM python:3.11-slim
+FROM python:3.11-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and project files
+# Copy requirements first for better caching
 COPY requirements.txt pyproject.toml README.md ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir .
+# Create dummy app directory
+RUN mkdir app && touch app/__init__.py
+
+# Install dependencies
+RUN pip install -r requirements.txt && pip install .
+
+# ============= PRODUCTION IMAGE =============
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY . .
 
 # Run Celery worker
-# NOTE: Requires Redis broker (REDIS_URL env var set)
+# Usage: celery -A app.tasks.celery_app worker --loglevel=info
+# Usage: celery -A app.tasks.celery_app beat --loglevel=info (for scheduler)
 CMD ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
