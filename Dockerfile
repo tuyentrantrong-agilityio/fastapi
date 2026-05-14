@@ -17,14 +17,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only requirements first for better layer caching
-COPY requirements.txt pyproject.toml README.md ./
+# Copy project files for installation
+COPY pyproject.toml README.md ./
 
 # Create dummy app directory to prevent setup.py errors
 RUN mkdir app && touch app/__init__.py
 
-# Install Python dependencies
-RUN pip install -r requirements.txt && pip install .
+# Install Python dependencies from pyproject.toml
+RUN pip install .
 
 # ============= PRODUCTION IMAGE =============
 FROM python:3.11-slim
