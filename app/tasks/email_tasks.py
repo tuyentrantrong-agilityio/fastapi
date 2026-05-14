@@ -206,10 +206,6 @@ def send_welcome_email_task(self, email: str, user_name: str = "User"):
     logger.info(f"[START] id={task_id} email={email}")
 
     try:
-        # Simulate workload for 3-5 seconds to observe concurrency
-        sleep_time = 3 if retry_count == 0 else 2
-        time.sleep(sleep_time)
-
         result = run_async(_send_welcome_email(email, user_name, retry_count=retry_count))
 
         duration = time.time() - start_time
@@ -239,10 +235,6 @@ def send_task_assigned_email_task(
     logger.info(f"[START] id={celery_task_id} email={email}")
 
     try:
-        # Simulate workload for 3-5 seconds
-        sleep_time = 3 if retry_count == 0 else 2
-        time.sleep(sleep_time)
-
         result = run_async(
             _send_task_assigned_email(
                 email,
