@@ -1,10 +1,18 @@
-"""Email service - handles sending emails via SMTP."""
+"""Email service - handles sending emails via SendGrid API.
 
+This service uses SendGrid's REST API for reliable email delivery.
+SendGrid is chosen over SMTP because:
+1. Railway Free tier blocks all SMTP ports (25, 465, 587, 2525)
+2. SendGrid API uses HTTPS on port 443 (allowed on Railway)
+3. Free tier: 100 emails/day
+4. Industry standard for transactional emails
+"""
+
+import json
 import logging
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import Optional
+
+import httpx
 
 from ..core.config import settings
 
@@ -12,11 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Service for sending emails via SMTP.
+    """Service for sending emails via SendGrid API.
+
+    SendGrid API Documentation:
+    https://docs.sendgrid.com/for-developers/sending-email/quickstart-python
 
     Usage:
         email_svc = EmailService()
-        await email_svc.send_email(
+        success = await email_svc.send_email(
             to="user@example.com",
             subject="Welcome!",
             html_content="<h1>Hello</h1>"
@@ -25,29 +36,26 @@ class EmailService:
 
     def __init__(
         self,
-        smtp_host: Optional[str] = None,
-        smtp_port: Optional[int] = None,
-        smtp_user: Optional[str] = None,
-        smtp_password: Optional[str] = None,
+        api_key: Optional[str] = None,
         from_email: Optional[str] = None,
     ):
-        """Initialize SMTP configuration.
+        """Initialize SendGrid configuration.
 
         Args:
-            smtp_host: SMTP server hostname (defaults from settings)
-            smtp_port: SMTP server port (typically 587 for TLS)
-            smtp_user: SMTP authentication username (defaults from settings)
-            smtp_password: SMTP authentication password (defaults from settings, spaces auto-removed)
-            from_email: Sender email address (defaults from settings)
+            api_key: SendGrid API key (format: SG.xxxxx) - defaults from settings
+            from_email: Sender email address - defaults from settings
         """
-        # Load from settings if not provided (always fresh!)
-        self.smtp_host = smtp_host or settings.SMTP_HOST
-        self.smtp_port = smtp_port or settings.SMTP_PORT
-        self.smtp_user = smtp_user or settings.SMTP_USER
-        # Auto-remove spaces from password (Google app passwords have spaces: xxxx xxxx xxxx xxxx)
-        password = smtp_password or settings.SMTP_PASSWORD
-        self.smtp_password = password.replace(" ", "") if password else ""
-        self.from_email = from_email or settings.SMTP_FROM_EMAIL
+        self.api_key = api_key or settings.SENDGRID_API_KEY
+        self.from_email = from_email or settings.SENDGRID_FROM_EMAIL
+        self.api_url = "https://api.sendgrid.com/v3/mail/send"
+
+        if not self.api_key:
+            logger.warning(
+                "⚠️  SENDGRID_API_KEY not configured! Email sending will fail. "
+                "Set SENDGRID_API_KEY in environment variables."
+            )
+        else:
+            logger.info("📧 Email service initialized with SendGrid API")
 
     async def send_email(
         self,
@@ -56,7 +64,7 @@ class EmailService:
         html_content: str,
         plain_content: Optional[str] = None,
     ) -> bool:
-        """Send an email via SMTP.
+        """Send an email via SendGrid API.
 
         Args:
             to: Recipient email address
@@ -66,41 +74,70 @@ class EmailService:
 
         Returns:
             True if email sent successfully, False otherwise
-
-        Note:
-            This runs synchronously in thread pool (called via BackgroundTasks).
-            For high volume, consider Celery + Redis in Phase 2.
         """
+        if not self.api_key:
+            logger.error("❌ Cannot send email: SENDGRID_API_KEY is not configured")
+            return False
+
         try:
-            # Create multi-part message
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = self.from_email
-            message["To"] = to
+            # Build SendGrid API request payload
+            payload = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to}],
+                        "subject": subject,
+                    }
+                ],
+                "from": {"email": self.from_email},
+                "content": [
+                    {
+                        "type": "text/plain",
+                        "value": plain_content or html_content.replace("<br>", "\n"),
+                    },
+                    {
+                        "type": "text/html",
+                        "value": html_content,
+                    },
+                ],
+            }
 
-            # Attach plain text version (fallback)
-            if plain_content:
-                part_plain = MIMEText(plain_content, "plain")
-                message.attach(part_plain)
+            # Send via SendGrid API with httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.api_url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=10.0,
+                )
 
-            # Attach HTML version (preferred)
-            part_html = MIMEText(html_content, "html")
-            message.attach(part_html)
+            # Check if email was sent successfully (202 Accepted is success)
+            if response.status_code == 202:
+                logger.info(
+                    f"✅ Email sent successfully to {to} with subject: {subject}"
+                )
+                return True
+            else:
+                # Log error response from SendGrid
+                error_msg = response.text
+                try:
+                    error_data = response.json()
+                    error_msg = json.dumps(error_data, indent=2)
+                except Exception:
+                    pass
+                logger.error(
+                    f"❌ SendGrid API error (status {response.status_code}) "
+                    f"sending to {to}: {error_msg}"
+                )
+                return False
 
-            # Send via SMTP (with 10s timeout to avoid hanging)
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                server.starttls()  # Use TLS encryption
-                server.login(self.smtp_user, self.smtp_password)
-                server.sendmail(self.from_email, to, message.as_string())
-
-            logger.info(f"Email sent successfully to {to} with subject: {subject}")
-            return True
-
-        except smtplib.SMTPException as e:
-            logger.error(f"SMTP error sending email to {to}: {str(e)}")
+        except httpx.RequestError as e:
+            logger.error(f"❌ SendGrid request error sending to {to}: {str(e)}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error sending email to {to}: {str(e)}")
+            logger.error(f"❌ Unexpected error sending email to {to}: {str(e)}")
             return False
 
 

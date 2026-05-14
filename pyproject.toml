@@ -18,6 +18,7 @@ dependencies = [
     "asyncpg>=0.29.0",
     "redis>=5.0.0",
     "celery>=5.3.0",
+    "httpx>=0.24.0",  # For SendGrid API calls
 ]
 
 [project.optional-dependencies]

@@ -41,12 +41,9 @@ class Settings(BaseSettings):
             v = v.replace("postgresql://", "postgresql+asyncpg://")
         return v
 
-    # ============= EMAIL CONFIGURATION =============
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@fastapi-practice.com"
+    # ============= EMAIL CONFIGURATION (SendGrid) =============
+    SENDGRID_API_KEY: str = ""  # Get from https://sendgrid.com (format: SG.xxxxx)
+    SENDGRID_FROM_EMAIL: str = "trongtuyenlekhiet@gmail.com"
     EMAIL_DISPATCHER: str = "celery"  # "background_tasks" or "celery"
 
     # ============= REDIS & CELERY CONFIGURATION =============
